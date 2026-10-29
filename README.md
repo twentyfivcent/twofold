@@ -1,6 +1,7 @@
 # TWOFOLD
+MADE ENTIRELY WITH GROKBOT FOR FUN 
 
-An original 2v2 browser FPS. Everyone in a match shares the same loadout; the first team to win 6 rounds takes the match. Empty slots are filled by bots, so you can play with one friend or a full lobby. Solo practice is available from the menu.
+An "original" 2v2 browser FPS inspired by COD Gunfight, since cod decides to get rid of the only fun gamemode they have. Everyone in a match shares the same loadout; the first team to win 6 rounds takes the match. Empty slots are filled by bots, so you can play with one friend or a full lobby. Solo practice is available from the menu.
 
 **Play:** [https://twentyfivcent.github.io/twofold/](https://twentyfivcent.github.io/twofold/)
 
