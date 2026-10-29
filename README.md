@@ -6,6 +6,8 @@ An original 2v2 browser FPS. Everyone in a match shares the same loadout; the fi
 
 The page is a single `index.html`. It loads three.js and PeerJS from unpkg. Online matches connect peer-to-peer; no game server is involved.
 
+v4 adds new guns and utilities, six three-lane maps (Dockyard 9, Sunspire Roof, Dustbowl Outpost, Glasshouse Atrium, Frostline Depot, and Greywater Keep), walled spawns, hitboxes, recoil, scopes, loadout voting, spectating, a damage recap, sound, textures, smarter bots, and a crosshair menu. While you are dead, click or Space cycles the player you watch, and F switches to a free camera.
+
 ## Host a match
 
 1. Open the game and set your name.
