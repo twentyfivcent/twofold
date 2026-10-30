@@ -151,9 +151,14 @@ input,select{background:#0f1720;color:#fff;border:1px solid #456;padding:8px;fon
 #mmTitle{font-size:22px;font-weight:bold;margin:10px 0 6px}#mmCancel{margin-top:14px}
 .mmspin{width:42px;height:42px;margin:0 auto;border-radius:50%;border:4px solid #234;border-top-color:#59c3ff;animation:mmsp 1s linear infinite}@keyframes mmsp{to{transform:rotate(360deg)}}
 .qpbtn{background:linear-gradient(180deg,#2f8cff,#1c5fc0)!important;color:#fff!important;font-weight:bold}
-.devtag{display:inline-block;margin-left:5px;padding:0;border:0;background:none;box-shadow:none;font-weight:900;font-size:1.05em;letter-spacing:.04em;line-height:1;color:#ff3b3b;text-shadow:0 1px 2px rgba(0,0,0,.85),0 0 1px #000;animation:devrb 2.3s linear infinite}
+.devtag{display:inline-block;margin-left:5px;padding:0;border:0;background:none;box-shadow:none;font-weight:900;font-size:1.05em;letter-spacing:.04em;line-height:1;color:#ff3b3b;text-shadow:0 1px 2px rgba(0,0,0,.85),0 0 1px #000;color:var(--dvc,#ff3b3b)}
 @keyframes devrb{0%{color:#ff3b3b}16%{color:#ff9f1a}33%{color:#ffe83a}50%{color:#3bff6a}66%{color:#2ad8ff}83%{color:#b45bff}100%{color:#ff3b3b}}
 #minimap{position:absolute;left:14px;top:14px;width:176px;height:176px;border-radius:50%;box-shadow:0 4px 14px #0008;pointer-events:none}
+.qpend .qpc{width:230px}.qpend .qpc b{font-size:20px}
+.backlobby .vk{display:inline;margin-right:6px;color:#fb6}
+.ldtabs{margin-bottom:10px}.ldtabs .pt{font-size:14px;padding:7px 16px}
+.ldwrap{display:flex;gap:16px;align-items:flex-start}.ldgrid{flex:1;display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}.ldgrid .scard{padding:4px;text-align:center;cursor:pointer}.ldgrid .scard.sel{outline:2px solid #5a9aff}
+#ldvBox{width:300px;flex:none;background:rgba(10,16,24,.6);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px;text-align:center}#ldvCv{width:280px;height:340px;display:block;margin:0 auto;cursor:grab;background:radial-gradient(circle at 50% 60%,#1d2a3a,#0b1018 70%);border-radius:8px}#ldvInfo .skvn{font-size:18px;font-weight:bold;margin-top:6px}#ldvEquip{margin-top:8px}
 .backlobby{display:block;margin:12px auto 0;padding:8px 18px;background:#1d2a3a;border:1px solid #5a7fa5;color:#dfefff;border-radius:8px;cursor:pointer}
 #vote .vc.v2{width:250px;text-align:left;padding:10px 12px;position:relative;transition:transform .12s,box-shadow .12s}
 #vote .vc.v2:hover{transform:translateY(-3px)}#vote .vc.v2.lead{box-shadow:0 0 0 2px #ffd24a,0 0 18px #ffd24a66}
@@ -182,7 +187,7 @@ input,select{background:#0f1720;color:#fff;border:1px solid #456;padding:8px;fon
 <canvas id="menuBg"></canvas>
 <div id="menu" class="scr m6">
 <div class="mwrap glass">
- <div class="pnav"><div class="ptitle">TWOFOLD<span>2V2 ROUND ARENA &middot; V7</span></div>
+ <div class="pnav"><div class="ptitle">TWOFOLD<span>2V2 ROUND ARENA &middot; V7.1</span></div>
   <button class="mn on" data-m="mPlay">Play</button><button class="mn" data-m="mLoad">Loadout &amp; Skins</button><button class="mn" data-m="mCrates">Crates</button><button class="mn" data-m="mStats">Stats &amp; Leaderboard</button><button class="mn" data-m="mSet">Settings</button>
   <div style="flex:1"></div>
   <div id="accPanel" class="accp" title="Account"></div>
@@ -190,7 +195,6 @@ input,select{background:#0f1720;color:#fff;border:1px solid #456;padding:8px;fon
  <div class="pbody">
   <div class="mpage" id="mPlay"><h3>Play</h3><div class="sub">Same loadout for everyone. Best team wins.</div>
    <div class="prow"><span>Name</span><input id="nameIn" maxlength="16"><span id="nameNote" class="hide" style="margin-left:4px"></span></div>
-   <div class="prow"><span>Map</span><select id="mapSel"></select></div>
    <div class="prow"><span>Bot difficulty</span><select id="diffSel"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select></div>
    <div class="playbtns"><button id="bQuick" class="qpbtn">Quick Play</button><button id="bPractice">Practice vs Bots</button><button id="bHost">Host Online Match</button></div>
    <div class="prow"><span>Join a friend</span><input id="codeIn" maxlength="5" placeholder="CODE" style="width:110px;text-transform:uppercase;letter-spacing:4px"><button id="bJoin" class="sm">Join</button></div>
@@ -226,6 +230,15 @@ input,select{background:#0f1720;color:#fff;border:1px solid #456;padding:8px;fon
 <div id="reel" class="hide"><div class="rwin"><div class="rtitle" id="reelTitle"></div><div class="rstrip"><div class="rline"></div><div id="reelTrack"></div></div><div id="reelRes"></div><button class="sm" id="reelClose">Collect</button></div></div>
 <div id="mmBox" class="hide glass"><div class="mmspin"></div><div id="mmTitle">Searching for players...</div><div id="mmSub" class="sub"></div><button id="mmCancel">Cancel</button></div>
 <div id="skv" class="hide"><div class="skvw glass"><canvas id="skvCv"></canvas><div class="skvside"><div id="skvInfo"></div><div class="row"><button class="sm" id="skvIn">Zoom +</button><button class="sm" id="skvOut">Zoom -</button><button class="sm" id="skvReset">Reset</button></div><button id="skvEquip">Equip</button><button id="skvClose">Close</button></div></div></div>
+<div id="pracSetup" class="scr hide">
+ <h2>PRACTICE VS BOTS</h2>
+ <div style="text-align:center;color:#7fd0ff;font-size:18px">OFFLINE - you and three bots</div>
+ <div id="pracTeams" style="display:flex;gap:30px;margin:10px"><div class="team t0"><b style="color:#2d8cff">BLUE</b><div id="pt0"></div></div><div class="team t1"><b style="color:#ff8a1e">ORANGE</b><div id="pt1"></div></div></div>
+ <div class="row"><span>Map</span><select id="pMap"></select></div>
+ <div class="row"><span>Bot difficulty</span><select id="pDiff"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select></div>
+ <div class="row"><button id="bPStart">Start Match</button></div>
+ <button id="bPBack">Back</button>
+</div>
 <div id="lobby" class="scr hide">
  <h2>LOBBY</h2>
  <div id="lqp" class="hide" style="text-align:center;color:#7fd0ff;font-size:18px">QUICK PLAY - empty slots are filled by bots</div><div id="codeBox"><div style="text-align:center;color:#9ab">Room code</div><div class="row"><span class="code" id="codeTxt">-----</span><button class="sm" id="bCopy">Copy</button></div></div>
@@ -301,9 +314,9 @@ if(settings.micVol===undefined)settings.micVol=1;if(settings.vcVol===undefined)s
 // ---- rebindable controls (codes are KeyboardEvent.code, or Mouse0/Mouse1/Mouse2 for mouse buttons)
 const KB_ACTIONS=[['forward','Move forward','KeyW'],['back','Move back','KeyS'],['left','Strafe left','KeyA'],['right','Strafe right','KeyD'],['jump','Jump / next spectate','Space'],['sprint','Sprint','ShiftLeft'],['steady','Hold breath (scoped)','ShiftLeft'],['crouch','Crouch','KeyC'],
  ['fire','Fire','Mouse0'],['ads','Aim down sights','Mouse2'],['reload','Reload','KeyR'],['prim','Primary weapon','Digit1'],['sec','Secondary weapon','Digit2'],['util','Utility (hold to cook)','KeyG'],['melee','Melee','KeyF'],
- ['vote1','Vote option 1','Digit1'],['vote2','Vote option 2','Digit2'],['vote3','Vote option 3','Digit3'],['score','Scoreboard','Tab'],['chat','Chat (all)','Enter'],['teamchat','Chat (team)','KeyY'],['ptt','Push-to-talk','KeyV'],['openmic','Toggle open mic',''],['freecam','Spectate: free camera','KeyX'],['nextw','Next weapon (wheel)','WheelDown'],['prevw','Previous weapon (wheel)','WheelUp'],['inspect','Inspect weapon','KeyI'],['takeover','Take over teammate bot (when dead)','KeyE'],['tacsprint','Tactical sprint (or double-tap Sprint)','']];
+ ['vote1','Vote option 1','Digit1'],['vote2','Vote option 2','Digit2'],['vote3','Vote option 3','Digit3'],['backlobby','Back to lobby / menu (match end)','Digit4'],['requeue','Matchmake again (Quick Play end)','Digit1'],['score','Scoreboard','Tab'],['chat','Chat (all)','Enter'],['teamchat','Chat (team)','KeyY'],['ptt','Push-to-talk','KeyV'],['openmic','Toggle open mic',''],['freecam','Spectate: free camera','KeyX'],['nextw','Next weapon (wheel)','WheelDown'],['prevw','Previous weapon (wheel)','WheelUp'],['inspect','Inspect weapon','KeyI'],['takeover','Take over teammate bot (when dead)','KeyE'],['tacsprint','Tactical sprint (or double-tap Sprint)','']];
 // pairs that may share a key because they never apply at the same time
-const KB_SHARE=[['sprint','steady'],['prim','vote1'],['sec','vote2']];
+const KB_SHARE=[['sprint','steady'],['prim','vote1'],['sec','vote2'],['requeue','prim'],['requeue','vote1']];
 function kbMap(){const m={};for(const [a,,d] of KB_ACTIONS)m[a]=d;return Object.assign(m,settings.keys||{})}
 let KBM=kbMap();
 function kc(a){return KBM[a]||''}
@@ -1090,6 +1103,7 @@ function hostTick(dt){
   if(G.rt<=0){const h0=teamHP(0),h1=teamHP(1);endRound(h0===h1?-1:h0>h1?0:1,'time')}}
  else if(G.rs==='end'){if(G.rt<=0)roundStart()}
  else if(G.rs==='over'){if(G.rt<=0){G.rs='mapvote';G.rt=MAPVOTE_TIME;G.mopts=mapVoteOptions();G.mvotes=[-1,-1,-1,-1];emit({t:'mapvote'})}}
+ else if(G.rs==='mapvote'&&G.qp){}
  else if(G.rs==='mapvote'){const hs=humans();const all=hs.length>0&&hs.every(p=>G.mvotes[p.id]>=0);
   if(G.rt<=0||(all&&G.rt<MAPVOTE_TIME-8)){const c=[0,0,0];for(const p of hs)if(G.mvotes[p.id]>=0)c[G.mvotes[p.id]]++;const mx=Math.max(...c);const wi=pick([0,1,2].filter(i=>c[i]===mx));
    G.nextMap=G.mopts[wi];G.rs='nextmap';G.rt=1.2;emit({t:'nextmap',m:G.nextMap,i:wi})}}
@@ -1872,13 +1886,13 @@ function handleEvent(e){if(typeof MSTAT_ev==='function')MSTAT_ev(e);
  else if(e.t==='beep'){SND.beep([e.x,e.y,e.z])}
  else if(e.t==='kpick'){if(e.s===ME){addKF('<span style="color:#cde">Knife picked up</span>');SND.ui(1200)}}
  else if(e.t==='bstk'){SND.clink([e.x,e.y,e.z])}
- else if(e.t==='mapvote'){resetAim();banner('<span style="font-size:30px">VOTE THE NEXT MAP</span>',1.5);SND.sting('vote')}
+ else if(e.t==='mapvote'){resetAim();if(G&&G.qp){banner('<span style="font-size:30px">MATCH OVER</span>',1.5);SND.sting('vote')}else banner('<span style="font-size:30px">VOTE THE NEXT MAP</span>',1.5);SND.sting('vote')}
  else if(e.t==='nextmap'){const mp=MAPS[e.m];banner(`<span style="font-size:30px">NEXT: ${mp?mp.n:''}</span>`,1.2);SND.sting('go')}
  else if(e.t==='flash'){addBoom(e.x,e.y,e.z,0xffffff,3);if(me.alive){const ey=eye(me),p=[e.x,e.y,e.z],dd=dist3(ey,p);if(dd<20&&los(ey,p)){const f=norm([p[0]-ey[0],p[1]-ey[1],p[2]-ey[2]]),v=dirYP(me.yaw,me.pitch);const dot=f[0]*v[0]+f[1]*v[1]+f[2]*v[2];flashT=Math.max(flashT,(dot>.3?3.2:dot>-.2?1.4:.5)*(1-dd/24))}}}
  else if(e.t==='go'){banner('FIGHT!',1.2);SND.sting('go')}
  else if(e.t==='flagon'){banner('<span style="font-size:30px">OVERTIME FLAG IS UP - HOLD IT FOR 3s</span>',2.5)}
  else if(e.t==='rend'){if(typeof MUS!=='undefined'&&e.win>=0)MUS.endSting(e.win===me.team);SND.sting(e.win===me.team?'win':'lose');const why={elim:'Team eliminated',flag:'Flag captured',time:'Time up - higher total team health'}[e.why];banner(e.win<0?`ROUND DRAW<div style="font-size:20px">${why}</div>`:`<span style="color:${e.win===me.team?'#7f7':'#f77'}">ROUND ${e.win===me.team?'WON':'LOST'}</span><div style="font-size:20px">${why}</div>`,3.5)}
- else if(e.t==='over'){const mvP=G.P[e.mvp];G.mvp={id:e.mvp,score:e.mvs,bot:!!e.mvb,name:mvP?mvP.name:'?'};const iAmMvp=e.mvp===ME&&!e.mvb;if(typeof ACC!=='undefined')ACC.matchOver(e.win===me.team,iAmMvp,G.mvp);banner(`<span style="font-size:64px;color:${e.win===me.team?'#7f7':'#f77'}">${e.win===me.team?'VICTORY':'DEFEAT'}</span><div style="font-size:22px">${G.sc[0]} - ${G.sc[1]}</div>${mvpBadge(G.mvp,me)}<div style="font-size:16px">Next map vote coming up...</div>`,6)}
+ else if(e.t==='over'){const mvP=G.P[e.mvp];G.mvp={id:e.mvp,score:e.mvs,bot:!!e.mvb,name:mvP?mvP.name:'?'};const iAmMvp=e.mvp===ME&&!e.mvb;if(typeof ACC!=='undefined')ACC.matchOver(e.win===me.team,iAmMvp,G.mvp);banner(`<span style="font-size:64px;color:${e.win===me.team?'#7f7':'#f77'}">${e.win===me.team?'VICTORY':'DEFEAT'}</span><div style="font-size:22px">${G.sc[0]} - ${G.sc[1]}</div>${mvpBadge(G.mvp,me)}${G.qp?"":`<div style="font-size:16px">Next map vote coming up...</div>`}`,6)}
  else if(e.t==='joined'){addKF(`<span style="color:#aaa">${e.n} joined - takes over a bot next round</span>`)}
  else if(e.t==='left'){addKF(`<span style="color:#aaa">${e.n} left - a bot took over</span>`)}
 }
@@ -1959,7 +1973,7 @@ function startGame(cfg){
  cfg.slots.forEach((s,i)=>{G.P[i].name=s.name;G.P[i].bot=s.bot;G.P[i].conn=s.conn||null;G.P[i].off=!!s.off;if(s.off){G.P[i].alive=false;G.P[i].pos=[0,-60,0]}});
  for(const p of pMeshes)scene.remove(p);pMeshes=G.P.map(p=>buildPlayerMesh(p,false));
  buildMap(m);vmId=null;for(const k in itemMeshes){scene.remove(itemMeshes[k]);delete itemMeshes[k]}resetAim();kfList=[];EV=[];wasLocked=false;
- ['#menu','#lobby','#pause'].forEach(s=>$(s).classList.add('hide'));$('#hud').classList.remove('hide');
+ ['#menu','#lobby','#pause','#pracSetup'].forEach(s=>$(s).classList.add('hide'));$('#hud').classList.remove('hide');
  if(HOST)roundStart();
  if(!OVERVIEW&&!AUTOPLAY)lockPointer();
  window.__G=G;if(typeof voiceUpdate==='function')voiceUpdate();
@@ -1996,7 +2010,7 @@ function step(now,draw){
   if(!G)return;
   netAcc+=rdt;if(netAcc>=1/30){netAcc=0;netFlush()}
   heartbeat(now);if(!G)return;
-  if(draw){render(rdt*SPEED);updateHUD(rdt*SPEED)}}
+  if(draw){const ts=window.__tscale||1;render(rdt*SPEED*ts);updateHUD(rdt*SPEED)}}
  else if(draw)renderFrame();
 }
 function heartbeat(now){
@@ -2092,7 +2106,7 @@ function render(dt){
  if(VK.mel>.38)VK.mel=.38;
  G.P.forEach((p,i)=>{const m=pMeshes[i];
   const ox=p.rpos[0],oz=p.rpos[2];
-  if(i!==ME||OVERVIEW){const k=Math.min(1,dt*15/Math.max(1,SPEED/2));for(let a=0;a<3;a++)p.rpos[a]+=(p.pos[a]-p.rpos[a])*k;if(Math.abs(p.pos[0]-p.rpos[0])+Math.abs(p.pos[2]-p.rpos[2])>5)p.rpos=p.pos.slice();let dy=p.yaw-p.ryaw;while(dy>Math.PI)dy-=2*Math.PI;while(dy<-Math.PI)dy+=2*Math.PI;p.ryaw+=dy*k}
+  if(i!==ME||OVERVIEW){const k=Math.min(1,dt*15/Math.max(1,SPEED/2));for(let a=0;a<3;a++)p.rpos[a]+=(p.pos[a]-p.rpos[a])*k;if(Math.abs(p.pos[0]-p.rpos[0])+Math.abs(p.pos[2]-p.rpos[2])>5)p.rpos=p.pos.slice();let dy=p.yaw-p.ryaw;while(dy>Math.PI)dy-=2*Math.PI;while(dy<-Math.PI)dy+=2*Math.PI;p.ryaw+=dy*k}else{p.rpos=p.pos.slice();p.ryaw=p.yaw}/*v7.1: own body/emote camera follow the live position*/
   m.visible=(i!==ME||OVERVIEW)&&!p.off;m.position.set(p.rpos[0],p.rpos[1],p.rpos[2]);m.rotation.set(0,p.ryaw,0);
   const u=m.userData;const mv=i===ME&&!OVERVIEW?Math.hypot(p.vel[0],p.vel[2]):dt>0?Math.hypot(p.rpos[0]-ox,p.rpos[2]-oz)/dt:0;u.spd+=(Math.min(9,mv)-u.spd)*Math.min(1,dt*10);
   if(p.melF&&!u.melF)u.mel=.38;u.melF=p.melF;
@@ -2247,7 +2261,7 @@ let LOBBYSEQ=0,REJ=null,LAST_ICE=null;
 function lobbyMsg(t){$('#lobbyMsg').textContent=t}
 async function hostOnline(fixed){
  let ice=ICE,iceErr='';try{ice=await getIce()}catch(e){iceErr=' (Relay setup failed: '+e.message+' - direct only)'}
- cleanupNet();const code=fixed||genCode();LOBBY={code,qp:!!fixed,host:true,slots:[{name:myName(),human:true,conn:null,tok:NETTOK},null,null,null],me:0,map:+$('#mapSel').value,ff:false,seq:++LOBBYSEQ};freshLobbyChat();
+ cleanupNet();const code=fixed||genCode();LOBBY={code,qp:!!fixed,host:true,slots:[{name:myName(),human:true,conn:null,tok:NETTOK},null,null,null],me:0,map:-1,ff:false,seq:++LOBBYSEQ};freshLobbyChat();
  showLobby();renderLobby();lobbyMsg('Registering room code...');
  peer=mkPeer(PFX+code,ice);
  peer.on('open',()=>{lobbyMsg('Share the code with friends, then press Start.'+(relayOn()&&!iceErr?' Relay fallback: ON.':'')+iceErr)});
@@ -2330,7 +2344,7 @@ function renderLobby(){const H=LOBBY.host;for(const t of [0,1]){$('#lt'+t).inner
  $('#lMapTxt').textContent=H?'':'(host picks)';$('#lFFTxt').textContent=LOBBY.ff?'ON':'OFF';
  const n=LOBBY.slots.filter(s=>!s||!s.off).length;const tc=t=>LOBBY.slots.filter((s,i)=>(i<2?0:1)===t&&(!s||!s.off)).length;{const me=LOBBY.me,ot=me<2?1:0,free=me>=0&&(ot?[2,3]:[0,1]).some(i=>!LOBBY.slots[i]||LOBBY.slots[i].off),b=$('#bSwitch');if(b){b.style.display=free?'':'none';b.textContent='Switch to '+(ot?'ORANGE':'BLUE')}}
  $('#bStart').disabled=H&&(tc(0)<1||tc(1)<1);if(H&&(tc(0)<1||tc(1)<1))lobbyMsg('Each team needs at least one player or bot.');}
-function hostStartMatch(){if(!LOBBY||!LOBBY.host)return;let map=LOBBY.map;if(!(map>=0))map=Math.floor(Math.random()*MAPS.length);
+function hostStartMatch(){if(!LOBBY||!LOBBY.host)return;let map=LOBBY.qp?-1:LOBBY.map;if(!(map>=0))map=Math.floor(Math.random()*MAPS.length);
  const BN=['Bot Ash','Bot Vex','Bot Rook','Bot Moss'];const slots=LOBBY.slots.map((s,i)=>s&&s.off?{name:'(empty)',bot:true,off:true}:s?{name:s.name,bot:false,conn:s.conn}:{name:BN[i],bot:true});
  const ff=!!LOBBY.ff,wire=slots.map(s=>({name:s.name,bot:s.bot,off:!!s.off}));
  const tod=rollTod(map);const now=performance.now();LOBBY.slots.forEach((s,i)=>{if(s&&s.conn){s.conn.lastHeard=now;netSend(s.conn,{t:'start',map,slots:wire,you:i,ff,tod})}});
@@ -2345,7 +2359,7 @@ function quitToMenu(msg){
  for(const m of pMeshes)scene.remove(m);pMeshes=[];if(mapGroup){scene.remove(mapGroup);mapGroup=null}for(const k in nadeMeshes)scene.remove(nadeMeshes[k]);for(const k in smokeMeshes)scene.remove(smokeMeshes[k]);nadeMeshes={};smokeMeshes={};for(const k in dynMeshes)scene.remove(dynMeshes[k]);dynMeshes={};for(const k in itemMeshes)scene.remove(itemMeshes[k]);for(const r of ROPES)scene.remove(r.m);ROPES=[];if(vm){camera.remove(vm);if(vm.userData.knife)camera.remove(vm.userData.knife);vm=null;vmId=null}
  for(const t of tracers)scene.remove(t.m);tracers=[];for(const b of booms)scene.remove(b.m);booms=[];
  scene.background=new THREE.Color(0x0a0b10);scene.fog=null;
- ['#hud','#pause','#lobby'].forEach(s=>$(s).classList.add('hide'));$('#menu').classList.remove('hide');$('#menuMsg').textContent=msg||'';
+ ['#hud','#pause','#lobby','#pracSetup'].forEach(s=>$(s).classList.add('hide'));$('#menu').classList.remove('hide');$('#menuMsg').textContent=msg||'';
 }
 
 
@@ -2457,6 +2471,8 @@ syncVoiceUI();
 // ===================== v6 SKINS + CRATES (procedural, matches supabase-setup.sql) =====================
 const RAR={common:{n:'Common',c:'#b8c4d0',w:500},uncommon:{n:'Uncommon',c:'#5fd16a',w:250},rare:{n:'Rare',c:'#4aa3ff',w:120},epic:{n:'Epic',c:'#c46bff',w:45},legendary:{n:'Legendary',c:'#ffb02e',w:12}};
 const RAR_ORDER=['common','uncommon','rare','epic','legendary'];
+// v7.1: crate lists show Common -> Legendary, alphabetical within a rarity
+function rarSort(L){return L.slice().sort((a,b)=>RAR_ORDER.indexOf(a.rar)-RAR_ORDER.indexOf(b.rar)||String(a.n).localeCompare(String(b.n)))}
 const CRATES=[{id:'ember',n:'Ember Crate',theme:'Volcanic forge',price:300,col:'#ff6a2a'},{id:'tide',n:'Tidewater Crate',theme:'Deep ocean',price:350,col:'#2ac0ff'},{id:'circuit',n:'Circuit Crate',theme:'Neon tech',price:400,col:'#7dff5a'}];
 // pat = which procedural generator, anim = live material animation, att = extra geometry
 const SKINS=[
@@ -2639,7 +2655,7 @@ function skinsPage(){const f=['all','owned',...CRATES.map(c=>c.id)];$('#skinFilt
 function cratesPage(){$('#crateGrid').innerHTML=CRATES.map(c=>{const o=crateOdds(c.id),L=SKINS.filter(s=>s.crate===c.id);const k=ACC.keys[c.id]||0;
  return `<div class="crate" style="border-color:${c.col}55"><h4 style="color:${c.col}">${c.n}</h4><div class="th">${c.theme} &middot; key $${c.price}</div><div class="cbox" style="background:radial-gradient(circle,${c.col}55,transparent 70%)">&#9635;</div>
  <div class="odds">${RAR_ORDER.filter(r=>o[r]).map(r=>`<div><span style="color:${RAR[r].c}">${RAR[r].n}</span><b>${o[r].toFixed(1)}%</b></div>`).join('')}</div>
- <div class="cskins">${L.map(s=>`<img title="${esc6(s.n)} (${RAR[s.rar].n}) - ${esc6(W[s.gun].n)}" src="${skinIcon(s.gun,s.id,120,48)||''}" style="border-color:${RAR[s.rar].c}">`).join('')}</div>
+ <div class="cskins">${rarSort(L).map(s=>`<img title="${esc6(s.n)} (${RAR[s.rar].n}) - ${esc6(W[s.gun].n)}" src="${skinIcon(s.gun,s.id,120,48)||''}" style="border-color:${RAR[s.rar].c}">`).join('')}</div>
  <div class="th">Keys owned: <b>${k}</b></div><button class="sm cbuy" data-c="${c.id}">Buy key ($${c.price})</button><button class="copen" data-c="${c.id}" ${k>0?'':'disabled'}>Open crate</button></div>`}).join('')+(ACC.ok()?'':`<div class="sub" style="grid-column:1/-1">${ACC.status==='ready'?'Sign in to earn money and open crates. Odds and contents are shown for everyone.':esc6(ACC.msg||'Account server not set up yet.')}</div>`);
  document.querySelectorAll('.cbuy').forEach(b=>b.onclick=async()=>{const r=await ACC.buyKey(b.dataset.c);if(r.error)menuMsg(r.error);cratesPage()});
  document.querySelectorAll('.copen').forEach(b=>b.onclick=()=>openReel(b.dataset.c))}
@@ -3129,7 +3145,7 @@ function xIcon(it,w,h){return it.gun==='_char'?portrait(it.id,null,w,h):portrait
  const html=XCRATES.map(c=>{const L=XITEMS.filter(s=>s.crate===c.id),T=L.reduce((a,s)=>a+s.w,0),o={};for(const s of L)o[s.rar]=(o[s.rar]||0)+s.w/T*100;const k=ACC.keys[c.id]||0;
   return `<div class="crate xcrate" data-x="${c.id}" style="border-color:${c.col}55"><h4 style="color:${c.col}">${c.n}</h4><div class="th">${c.theme} &middot; key $${c.price}</div><div class="cbox" style="background:radial-gradient(circle,${c.col}55,transparent 70%)">${c.kind==='char'?'&#9817;':'&#9835;'}</div>
   <div class="odds">${RAR_ORDER.filter(r=>o[r]).map(r=>`<div><span style="color:${RAR[r].c}">${RAR[r].n}</span><b>${o[r].toFixed(1)}%</b></div>`).join('')}</div>
-  <div class="cskins">${L.map(s=>`<img title="${esc6(s.n)} (${RAR[s.rar].n})" src="${xIcon(s,60,76)}" style="border-color:${RAR[s.rar].c};height:56px;width:auto;background:#0d1118">`).join('')}</div>
+  <div class="cskins">${rarSort(L).map(s=>`<img title="${esc6(s.n)} (${RAR[s.rar].n})" src="${xIcon(s,60,76)}" style="border-color:${RAR[s.rar].c};height:56px;width:auto;background:#0d1118">`).join('')}</div>
   <div class="th">Keys owned: <b>${k}</b></div><button class="sm cbuy" data-c="${c.id}">Buy key ($${c.price})</button><button class="copen" data-c="${c.id}" ${k>0?'':'disabled'}>Open crate</button></div>`}).join('');
  if(tail)tail.insertAdjacentHTML('beforebegin',html);else grid.insertAdjacentHTML('beforeend',html);
  grid.querySelectorAll('.xcrate .cbuy').forEach(b=>b.onclick=async()=>{const r=await ACC.buyKey(b.dataset.c);if(r.error)menuMsg(r.error);cratesPage()});grid.querySelectorAll('.xcrate .copen').forEach(b=>b.onclick=()=>openReel(b.dataset.c))}}
@@ -3385,9 +3401,99 @@ document.head.insertAdjacentHTML('beforeend',`<style>#onlineCount{margin-top:6px
 #onlineCount i{width:8px;height:8px;border-radius:50%;background:#3ddc6a;box-shadow:0 0 6px #3ddc6a;animation:onlp 2.4s ease-in-out infinite}#onlineCount b{color:#e8fff0;font-weight:800}
 @keyframes onlp{0%,100%{opacity:1}50%{opacity:.45}}</style>`);
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',onlineStart);else onlineStart();
+// ===================== v7.1: synced DEV tag colour, end-of-match keybinds, Quick Play end panel =====================
+// DEV tag colour is driven from one clock so HUD text rebuilt every frame (chat, killfeed) still cycles smoothly (2.3s loop).
+{const ST=[[0,0xff3b3b],[.16,0xff9f1a],[.33,0xffe83a],[.5,0x3bff6a],[.66,0x2ad8ff],[.83,0xb45bff],[1,0xff3b3b]];
+ const lerp=(a,b,f)=>{const r=(a>>16)+(((b>>16)-(a>>16))*f),g=((a>>8)&255)+((((b>>8)&255)-((a>>8)&255))*f),bl=(a&255)+(((b&255)-(a&255))*f);return `rgb(${r|0},${g|0},${bl|0})`};
+ const tick=()=>{const t=(performance.now()%2300)/2300;let i=0;while(i<ST.length-2&&t>ST[i+1][0])i++;const f=(t-ST[i][0])/(ST[i+1][0]-ST[i][0]);document.documentElement.style.setProperty('--dvc',lerp(ST[i][1],ST[i+1][1],Math.max(0,Math.min(1,f))))};
+ tick();setInterval(tick,40)}
+// ---- remember whether this match came from Quick Play (host and clients both have LOBBY.qp)
+{const _sg=startGame;startGame=function(cfg){const r=_sg.apply(this,arguments);try{if(G)G.qp=!!(LOBBY&&LOBBY.qp)}catch(e){}return r}}
+const QPEND={t:0,k:null};
+function qpEndLeft(){if(!QPEND.t)QPEND.t=performance.now()+MAPVOTE_TIME*1000;return Math.max(0,(QPEND.t-performance.now())/1000)}
+function qpMenu(){QPEND.t=0;try{MM.reset()}catch(e){}quitToMenu('')}
+function qpRequeue(){QPEND.t=0;try{MM.reset()}catch(e){}quitToMenu('');try{MM.start()}catch(e){}}
+// ---- end-of-match keys (work while pointer-locked / fullscreen)
+{const _pa=pressAction;pressAction=function(code,rep){
+ if(G&&!rep&&(G.rs==='mapvote'||G.rs==='nextmap')){
+  if(G.qp&&G.rs==='mapvote'){if(isKey(code,'requeue')){qpRequeue();return true}if(isKey(code,'backlobby')){qpMenu();return true}}
+  else if(isKey(code,'backlobby')){backToLobbyClick();return true}}
+ return _pa(code,rep)}}
+// ---- HUD: QP end panel instead of the map vote; key hint on the back-to-lobby button
+{const _mv=mapVoteHUD;mapVoteHUD=function(){
+ if(G&&G.qp&&G.rs==='mapvote'){const el=$('#mvote');el.classList.remove('hide');const left=qpEndLeft();
+  if(QPEND.k!=='qp'){QPEND.k='qp';MVUI.k=null;el.innerHTML=`<div class="mvh">QUICK PLAY - MATCH OVER <span id="qpT" style="color:#fb6"></span></div><div class="mvr qpend"><button class="mvc qpc" id="bQpAgain"><div class="vk">[${keyName(kc('requeue'))}]</div><b>Matchmake again</b><div style="color:#9ab;font-size:12px">New match on a random map</div></button><button class="mvc qpc" id="bQpMenu"><div class="vk">[${keyName(kc('backlobby'))}]</div><b>Back to menu</b><div style="color:#9ab;font-size:12px">Leave Quick Play</div></button></div>`;
+   $('#bQpAgain').onclick=e=>{e.stopPropagation();qpRequeue()};$('#bQpMenu').onclick=e=>{e.stopPropagation();qpMenu()}}
+  const t=$('#qpT');if(t)t.textContent=Math.ceil(left)+'s';if(left<=0)qpMenu();return}
+ if(QPEND.k==='qp'){QPEND.k=null;QPEND.t=0}
+ _mv()}}
+// back button textContent is rewritten each frame by the v7 hook; keep the hint by rewriting it as label + key span
+{const _mv2=mapVoteHUD;mapVoteHUD=function(){_mv2();const b=$('#bBackLobby');if(!b||!G||G.qp&&G.rs==='mapvote')return;const lbl=!LOBBY?'Back to Menu':HOST?'Back to Lobby (everyone)':G.backReq?'Back to Lobby - requested':'Back to Lobby (vote)';const k='['+keyName(kc('backlobby'))+']';
+ const h=`<span class="vk">${k}</span>${lbl}`;if(b.innerHTML!==h)b.innerHTML=h}}
+// ---- Quick Play client whose host leaves during the end screen: go to the menu instead of trying to reconnect
+{const _cr=clientReconnect;clientReconnect=function(w){if(G&&G.qp&&(G.rs==='mapvote'||G.rs==='over'||G.rs==='nextmap')){qpMenu();$('#menuMsg').textContent='The match is over - the host left. Press Quick Play to find a new match.';return}return _cr.apply(this,arguments)}}
+// ===================== v7.1: Loadout split into Gun Skins / Characters / Emotes, with live 3D previews =====================
+let LDT='skins';const LDV={r:null,sc:null,cam:null,m:null,key:'',sel:{chars:null,emotes:null},yaw:0,drag:null,idle:9,raf:0};
+function ldvBox(){let b=$('#ldvBox');if(!b){b=document.createElement('div');b.id='ldvBox';b.innerHTML='<canvas id="ldvCv" width="280" height="340"></canvas><div id="ldvInfo"></div><button id="ldvEquip" class="sm"></button>';
+ const cv=b.querySelector('canvas');cv.onpointerdown=e=>{LDV.drag=e.clientX;LDV.idle=0;try{cv.setPointerCapture(e.pointerId)}catch(_){}};cv.onpointerup=()=>LDV.drag=null;cv.onpointermove=e=>{if(LDV.drag===null)return;LDV.yaw+=(e.clientX-LDV.drag)*.012;LDV.drag=e.clientX;LDV.idle=0}}return b}
+function ldvInit(){if(LDV.r)return true;try{LDV.r=new THREE.WebGLRenderer({canvas:$('#ldvCv'),antialias:true,alpha:true,preserveDrawingBuffer:true})}catch(e){return false}LDV.r.setPixelRatio(Math.min(2,devicePixelRatio||1));if(THREE.sRGBEncoding)LDV.r.outputEncoding=THREE.sRGBEncoding;
+ LDV.sc=new THREE.Scene();LDV.sc.add(new THREE.HemisphereLight(0xdde8ff,0x302820,1.1));const d=new THREE.DirectionalLight(0xffffff,1.3);d.position.set(2,4,3);LDV.sc.add(d);const r2=new THREE.DirectionalLight(0x88aaff,.6);r2.position.set(-3,2,-2);LDV.sc.add(r2);LDV.cam=new THREE.PerspectiveCamera(30,280/340,.1,30);return true}
+function ldvSet(cid,emo){const key=cid+'|'+(emo||'');if(LDV.key===key&&LDV.m)return;LDV.key=key;if(LDV.m)LDV.sc.remove(LDV.m);const q0=settings.quality;settings.quality='medium';let m;try{m=buildCharMesh({team:0,id:-1},false,cid)}finally{settings.quality=q0}scene.remove(m);
+ for(const k of ['marker','talk','tag','ring']){const o=m[k]||m.userData[k];if(o&&o.isObject3D)o.visible=false}LDV.m=m;LDV.emo=emo||null;LDV.t0=performance.now();LDV.yaw=0;LDV.idle=9;LDV.sc.add(m)}
+function ldvLoop(){cancelAnimationFrame(LDV.raf);const f=()=>{const box=$('#ldvBox');if(!box||!box.isConnected||LDT==='skins'||$('#mLoad').classList.contains('hide')||$('#menu').classList.contains('hide'))return;
+ const m=LDV.m;if(m){LDV.idle+=1/60;if(LDV.drag===null&&LDV.idle>1.5)LDV.yaw+=.008;m.rotation.y=Math.PI+.35+LDV.yaw;const u=m.userData;
+  if(LDV.emo&&EMOTE[LDV.emo]){const D=EMOTE[LDV.emo].dur,t=((performance.now()-LDV.t0)/1000)%(D+.6);try{if(t<D)emoPose({},u,LDV.emo,t);else for(const A of u.arms){A.sh.rotation.set(.15,0,A.sd*.12);A.el.rotation.x=-.2}}catch(e){}window.__ldvT=t}
+  else for(const A of u.arms){A.sh.rotation.set(.15,0,A.sd*.12);A.el.rotation.x=-.2}
+  LDV.cam.position.set(0,1.15,LDV.emo?4.6:3.9);LDV.cam.lookAt(0,.98,0);LDV.r.setClearColor(0,0);LDV.r.render(LDV.sc,LDV.cam);window.__ldvFrames=(window.__ldvFrames||0)+1}
+ LDV.raf=requestAnimationFrame(f)};f()}
+function ldCrateName(it){const c=XCRATES.find(x=>x.id===it.crate);return c?c.n:'a crate'}
+function ldRender(){const sec=$('#charSec');if(!sec)return;const chars=LDT==='chars',L=chars?CHARS:EMOTES;const eqc=charOf({id:ME,bot:false});
+ let sel=LDV.sel[LDT];if(!sel||!L.find(x=>x.id===sel))sel=LDV.sel[LDT]=chars?eqc:(L.find(e=>e.free)||L[0]).id;const it=chars?CHAR[sel]:EMOTE[sel];const own=!!(it.free||ACC.owned[it.id]);
+ sec.innerHTML=`<div class="sub" style="margin:4px 0 8px">${chars?'Pick a character to preview it. Owned characters can be equipped (synced to other players in matches).':'Pick an emote to preview it on your equipped character. Owned emotes are in your wheel - hold <b>'+esc6(keyLbl(KBM.emote))+'</b> in a match.'}</div>
+ <div class="ldwrap"><div class="ldgrid">${L.map(c=>{const o=c.free||ACC.owned[c.id],eq=chars&&eqc===c.id;return `<div class="scard ${o?'':'lock'} ${eq?'eq':''} ${c.id===sel?'sel':''}" data-i="${c.id}"><div class="rb" style="background:${RAR[c.rar].c}"></div>${eq?'<span class="tag">EQUIPPED</span>':o?'':'<span class="tag" style="background:#444">&#128274; LOCKED</span>'}<img src="${chars?portrait(c.id,null,96,120):portrait(eqc,c.id,96,120)}" style="height:96px;width:auto;display:block;margin:0 auto"><div style="font-size:12px">${esc6(c.n)}</div><div style="font-size:10px;color:${RAR[c.rar].c}">${RAR[c.rar].n}</div></div>`}).join('')}</div><div id="ldvSlot"></div></div>`;
+ const box=ldvBox();$('#ldvSlot').appendChild(box);
+ $('#ldvInfo').innerHTML=`<div class="skvn">${esc6(it.n)}</div><div><span style="color:${RAR[it.rar].c};font-weight:bold">${RAR[it.rar].n}</span> &middot; ${chars?'Character':'Emote'}</div>${own?'':`<div class="sub" style="color:#fb6">&#128274; Not owned - get it from the ${esc6(ldCrateName(it))} (Crates tab)</div>`}<div class="sub">Drag to rotate</div>`;
+ const eb=$('#ldvEquip');if(chars){const eq=eqc===it.id;eb.style.display='';eb.disabled=!own||eq;eb.textContent=!own?'Locked':eq?'Equipped':'Equip';
+  eb.onclick=async()=>{if(!ACC.ok()){menuMsg('Sign in to change character.');return}const r=await ACC.equip('_char',it.free?'':it.id);if(r&&r.error)menuMsg(r.error);skinsPage()}}
+ else{eb.style.display='';eb.disabled=true;eb.textContent=own?'Owned - in your emote wheel':'Locked'}
+ sec.querySelectorAll('.ldgrid .scard').forEach(el=>el.onclick=()=>{LDV.sel[LDT]=el.dataset.i;ldRender()});
+ if(ldvInit()){ldvSet(chars?it.id:eqc,chars?null:it.id);ldvLoop()}}
+{const _sp=skinsPage;skinsPage=function(){_sp();const pg=$('#mLoad');if(!pg)return;let tb=$('#ldTabs');if(!tb){tb=document.createElement('div');tb.id='ldTabs';tb.className='ptabs ldtabs';pg.insertBefore(tb,$('#skinFilter'))}
+ tb.innerHTML=[['skins','Gun Skins'],['chars','Characters'],['emotes','Emotes']].map(([k,n])=>`<button class="pt ${LDT===k?'on':''}" data-t="${k}">${n}</button>`).join('');tb.querySelectorAll('.pt').forEach(b=>b.onclick=()=>{LDT=b.dataset.t;skinsPage()});
+ const sk=LDT==='skins';$('#skinFilter').style.display=sk?'':'none';$('#skinGrid').style.display=sk?'':'none';const sec=$('#charSec');
+ const sub=pg.querySelector(':scope > .sub');if(sub)sub.textContent=sk?'Equip skins you own. Skins show on your viewmodel, your third-person model, HUD icons, and to everyone in online matches.':LDT==='chars'?'Characters you play as. Everyone in an online match sees your character.':'Emotes you can play in matches.';
+ if(sec){if(sk){sec.innerHTML='';sec.style.display='none'}else{sec.style.display='';ldRender()}}}}
+window.__ld={get LDT(){return LDT},set LDT(v){LDT=v},LDV,ldRender};
+// ===================== v7.1: smooth match end -> podium =====================
+// Cause of the old 1-4s freeze: podStart() added a shadow-casting SpotLight + 2 PointLights to the scene, which changes the light
+// count, so three.js recompiled EVERY material's shader in the same frame (plus new podium materials). Fix: at match start (while
+// the map is loading anyway) build a throwaway podium set and renderer.compile() with it, so the podium-light shader variants are
+// cached; then on match end: ~1.2s slow motion with the VICTORY/DEFEAT banner, 0.6s fade to black, build podium, 0.6s fade in.
+function podWarm(){if(!G||!G.mapDef||typeof renderer==='undefined')return;const t0=performance.now();try{const grp=new THREE.Group();podSet(grp,podStage(),0,0);
+ const tx=plaqueTex('Warmup',false,0,0,false);grp.add(new THREE.Mesh(new THREE.PlaneGeometry(1,.4),new THREE.MeshStandardMaterial({map:tx.t,metalness:.75,roughness:.3,emissive:0x2a1d05,emissiveMap:tx.t,emissiveIntensity:.35})));
+ grp.add(new THREE.Mesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshStandardMaterial({color:0x2a3040,metalness:.2,roughness:.55})));grp.traverse(o=>{if(o.isMesh){o.castShadow=o.receiveShadow=true}});
+ scene.add(grp);const hid=[];scene.traverse(o=>{if(!o.visible&&!o.isLight){hid.push(o);o.visible=true}});const prt=renderer.getRenderTarget();try{if(typeof composer!=='undefined'&&composer)renderer.setRenderTarget(composer.readBuffer);renderer.compile(scene,camera)}finally{renderer.setRenderTarget(prt);for(const o of hid)o.visible=false}
+ const S=podStage(),cp=camera.position.clone(),cq=camera.quaternion.clone(),fov=camera.fov,rt=[S.d[2],0,-S.d[0]];camera.position.set(S.c[0]+S.d[0]*8.8+rt[0]*1.35,S.c[1]+1.9,S.c[2]+S.d[2]*8.8+rt[2]*1.35);camera.lookAt(S.c[0]+rt[0]*1.35,S.c[1]+1.15,S.c[2]-S.d[2]*.8);camera.fov=50;camera.updateProjectionMatrix();
+ renderFrame();camera.position.copy(cp);camera.quaternion.copy(cq);camera.fov=fov;camera.updateProjectionMatrix();scene.remove(grp);window.__podWarmMs=Math.round(performance.now()-t0)}catch(e){console.warn('podWarm',e)}}
+{const _sg2=startGame;startGame=function(cfg){const r=_sg2.apply(this,arguments);if(G)G._podWarm=0;return r}}
+// warm once per match on the first frame where every player mesh exists (round 1 pre-countdown)
+setInterval(()=>{try{if(G&&!G._podWarm&&G.P.every((p,i)=>pMeshes[i])&&(G.rs==='pre'||G.rs==='vote'||G.rs==='live')){G._podWarm=1;podWarm()}}catch(e){}},250);
+const PODTR={on:false,e:null,t0:0,built:false};
+function podFadeEl(){let f=$('#podFade');if(!f){f=document.createElement('div');f.id='podFade';f.style.cssText='position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:7';document.body.appendChild(f)}return f}
+{const _he2=handleEvent;handleEvent=function(e){if(e&&e.t==='podium'&&!window.__podInstant){PODTR.on=true;PODTR.e=e;PODTR.t0=performance.now();PODTR.built=false;PODTR.defer=null;document.body.classList.add('podtrans');window.__podTr={start:PODTR.t0};return}return _he2(e)}}
+function podTrTick(){const f=podFadeEl();if(!PODTR.on){if(!PODIUM&&+f.style.opacity)f.style.opacity=0;return}if(!G){PODTR.on=false;window.__tscale=1;f.style.opacity=0;document.body.classList.remove('podtrans');return}
+ const t=(performance.now()-PODTR.t0)/1000,SL=1.2,FO=.6,FI=.6,ss=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x)};
+ if(t<SL){window.__tscale=.3;f.style.opacity=0}
+ else if(t<SL+FO){window.__tscale=.3;f.style.opacity=ss((t-SL)/FO).toFixed(3)}
+ else if(!PODTR.built){f.style.opacity=1;PODTR.built=true;window.__tscale=1;const b0=performance.now();try{podStart(PODTR.e)}catch(x){console.warn('podium',x)}window.__podTr.build=Math.round(performance.now()-b0);bannerT=0;PODTR.defer=null;PODTR.t1=performance.now()}
+ else{const k=(performance.now()-PODTR.t1)/1000/FI;f.style.opacity=(1-ss(k)).toFixed(3);if(k>=1){f.style.opacity=0;PODTR.on=false;document.body.classList.remove('podtrans');window.__podTr.done=performance.now()}}}
+// keep the VICTORY/DEFEAT banner up through the slow-mo; any banner raised meanwhile (map vote / match over) shows once the podium is in
+{const _bn=banner;banner=function(t,x){if(PODTR.on&&!PODTR.built&&!/VICTORY|DEFEAT/.test(String(t))&&/VICTORY|DEFEAT/.test($('#banner').textContent)){PODTR.defer=[t,x];bannerT=Math.max(bannerT,3);return}return _bn(t,x)}}
+{const _rf3=renderFrame;renderFrame=function(){try{podTrTick()}catch(e){}return _rf3()}}
+{const _mv3=mapVoteHUD;mapVoteHUD=function(){if(PODTR.on&&!PODTR.built){$('#mvote').classList.add('hide');return}if(PODTR.on&&G&&G.qp&&QPEND.t)QPEND.t=Math.max(QPEND.t,performance.now()+MAPVOTE_TIME*1000-1);return _mv3()}}
 // ===================== MENU WIRING =====================
 $('#nameIn').value=settings.name;$('#nameIn').oninput=e=>{if(ACC.acctName())return;settings.name=e.target.value.slice(0,16)||'Player';saveSettings()};
-$('#mapSel').innerHTML='<option value="-1">Random map</option>'+MAPS.map((m,i)=>`<option value="${i}">${m.n}</option>`).join('');
+$('#pMap').innerHTML='<option value="-1">Random map</option>'+MAPS.map((m,i)=>`<option value="${i}">${m.n} - ${m.era}</option>`).join('');
 function syncSens(){for(const [a,b] of [['#sensIn','#sensV'],['#sensIn2','#sensV2']]){$(a).value=settings.sens;$(b).textContent=(+settings.sens).toFixed(2)}}
 for(const s of ['#sensIn','#sensIn2'])$(s).oninput=e=>{settings.sens=+e.target.value;saveSettings();syncSens()};syncSens();
 if(settings.vol===undefined)settings.vol=.7;function syncVol(){for(const [a,b] of [['#volIn','#volV'],['#volIn2','#volV2']]){$(a).value=settings.vol;$(b).textContent=Math.round(settings.vol*100)+'%'}}
@@ -3424,13 +3530,21 @@ document.querySelectorAll('.pt').forEach(b=>b.onclick=()=>{document.querySelecto
 $('#dnIn2').checked=settings.dmgNums!==false;$('#dnIn2').onchange=e=>{settings.dmgNums=e.target.checked;$('#dnIn').checked=e.target.checked;saveSettings()};
 function pauseTick(){if(!$('#pause').classList.contains('hide')&&G){if(!$('#pScore').classList.contains('hide'))$('#pSb').innerHTML=$('#sb').innerHTML||'';$('#pInfo').innerHTML=`<div class="prow"><span>Map</span><b>${G.mapDef.n}</b></div><div class="prow"><span>Score</span><b>${G.sc[0]} - ${G.sc[1]}</b></div><div class="prow"><span>Voice</span><b>${VOICE.st==='on'?'mic ready':VOICE.st==='nomic'?'listen-only (no mic)':'off'}</b></div>`;$('#vcStat').textContent='Voice status: '+VOICE.st}}
 setInterval(pauseTick,300);
-$('#lMap').onchange=e=>{if(LOBBY&&LOBBY.host){LOBBY.map=+e.target.value;broadcastLobby()}};
+$('#lMap').onchange=e=>{if(LOBBY&&LOBBY.host&&!LOBBY.qp){LOBBY.map=+e.target.value;broadcastLobby()}};
 $('#lFF').onchange=e=>{if(LOBBY&&LOBBY.host){LOBBY.ff=e.target.checked;broadcastLobby()}};
 setTimeout(makeIcons,200);
 validateMaps();
-function practice(map){if(map===undefined)map=+$('#mapSel').value;if(!(map>=0))map=Math.floor(Math.random()*MAPS.length);cleanupNet();
+const PRAC_SLOTS=[{name:'Bot Ash',bot:true},{name:'Bot Rook',bot:true},{name:'Bot Moss',bot:true}];
+function pracSlot(n,me){return `<div class="slot"><span>${esc0(n)}</span><span style="color:${me?'#7fd0ff':'#9ab'}">${me?'YOU':'BOT'}</span></div>`}
+function esc0(t){return String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function showPracSetup(){$('#pt0').innerHTML=pracSlot(myName(),1)+pracSlot(PRAC_SLOTS[0].name);$('#pt1').innerHTML=pracSlot(PRAC_SLOTS[1].name)+pracSlot(PRAC_SLOTS[2].name);$('#pDiff').value=$('#diffSel').value;$('#menu').classList.add('hide');$('#pracSetup').classList.remove('hide')}
+function hidePracSetup(){$('#pracSetup').classList.add('hide');$('#menu').classList.remove('hide')}
+$('#pDiff').onchange=e=>{$('#diffSel').value=e.target.value;$('#diffSel').dispatchEvent(new Event('change'))};
+$('#bPBack').onclick=hidePracSetup;
+$('#bPStart').onclick=()=>{$('#pracSetup').classList.add('hide');practice(+$('#pMap').value)};
+function practice(map){if(map===undefined)map=-1;if(!(map>=0))map=Math.floor(Math.random()*MAPS.length);cleanupNet();
  startGame({map,me:0,host:true,slots:[{name:myName(),bot:false},{name:'Bot Ash',bot:true},{name:'Bot Rook',bot:true},{name:'Bot Moss',bot:true}]})}
-$('#bPractice').onclick=()=>practice();
+$('#bPractice').onclick=()=>showPracSetup();
 $('#bHost').onclick=()=>hostOnline();$('#bQuick').onclick=()=>MM.start();$('#mmCancel').onclick=()=>MM.cancel();
 $('#bJoin').onclick=()=>joinOnline($('#codeIn').value);
 $('#codeIn').onkeydown=e=>{if(e.key==='Enter')joinOnline($('#codeIn').value)};
@@ -3443,7 +3557,7 @@ $('#bQuit').onclick=()=>quitToMenu('');
 addEventListener('beforeunload',()=>cleanupNet());
 requestAnimationFrame(frame);
 v6MenuInit();
-window.__api={simDrop(){const c=hostConn;if(c)c.close()},get NETTOK(){return NETTOK},sendChat,hostChat,castMapVote,hostNextMatch,resetAim,kbOpen,applyQuality,checkSpawns,voiceIds,get VOICE(){return VOICE},get CHATLOG(){return CHATLOG},fireShot,hostOnline,joinOnline,hostStartMatch,quitToMenu,W,MAPS,UT,castVote,validateMaps,hitScan,partBoxes,specCycle,hostAction,practice,damage,equip,roundStart,navPath,buildNav,makeIcons,ICON,xhCfg,drawXH,get SPEC(){return SPEC},get LIFE(){return LIFE},get G(){return G},get LOBBY(){return LOBBY},get ME(){return ME}};
+window.__api={simDrop(){const c=hostConn;if(c)c.close()},get NETTOK(){return NETTOK},sendChat,hostChat,castMapVote,hostNextMatch,resetAim,kbOpen,applyQuality,checkSpawns,voiceIds,get VOICE(){return VOICE},get CHATLOG(){return CHATLOG},fireShot,hostOnline,joinOnline,hostStartMatch,quitToMenu,W,MAPS,UT,castVote,validateMaps,hitScan,partBoxes,specCycle,hostAction,practice,showPracSetup,damage,equip,roundStart,navPath,buildNav,makeIcons,ICON,xhCfg,drawXH,get SPEC(){return SPEC},get LIFE(){return LIFE},get G(){return G},get LOBBY(){return LOBBY},get ME(){return ME}};
 if(Q.has('practice'))practice(Q.has('map')?+Q.get('map'):undefined);
 (function(){const r=settings.relay=settings.relay||{mode:'off'};const ids={rMode:'mode',rApp:'app',rKey:'key',rUrl:'url',rUser:'user',rCred:'cred'};
  for(const k in ids)$('#'+k).value=r[ids[k]]||(k==='rMode'?'off':'');
