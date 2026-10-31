@@ -1,0 +1,68 @@
+// ===================== INPUT (all actions go through the rebindable keymap: kc('action')) =====================
+const K={};let MELSEL=false,WHL=0,locked=false,swReq,KBCAP=null,CHAT={open:false,team:false};
+function deadView(){return G&&!G.P[ME].alive&&!G.waiting&&(G.rs==='live'||G.rs==='end')}
+function specCycle(d){SPEC.i+=d;SND.ui(500);resetAim()}
+function down(a){const c=kc(a);return !!(c&&K[c])}
+function isKey(code,a){return code&&kc(a)===code}
+function pressAction(code,rep){
+ if(!G)return;
+ if(isKey(code,'chat')){openChat(false);return true}
+ if(isKey(code,'teamchat')){openChat(true);return true}
+ if(isKey(code,'openmic')&&!rep){settings.openMic=!settings.openMic;saveSettings();syncVoiceUI();voiceUpdate();addKF('<span style="color:#9cf">Open mic '+(settings.openMic?'ON':'OFF')+'</span>');return true}
+ if(G.rs==='vote'){for(const i of [1,2,3])if(isKey(code,'vote'+i)){castVote(i-1);return true}}
+ if(G.rs==='mapvote'){for(const i of [1,2,3])if(isKey(code,'vote'+i)){castMapVote(i-1);return true}}
+ if(deadView()&&!rep){if(isKey(code,'jump')){specCycle(1);return true}if(isKey(code,'freecam')){SPEC.free=!SPEC.free;SPEC.fc=null;return true}}
+ if(!rep&&v6Press(code))return true;
+ if(isKey(code,'prim')){swReq=0;MELSEL=false}if(isKey(code,'sec')){swReq=1;MELSEL=false}
+ if(isKey(code,'nextw'))cycleWeapon(1);if(isKey(code,'prevw'))cycleWeapon(-1);
+}
+addEventListener('keydown',e=>{
+ if(KBCAP){e.preventDefault();kbCapture(e.code);return}
+ if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
+ K[e.code]=true;if(G&&(e.code==='Tab'||e.code==='Space'||e.code===kc('score')))e.preventDefault();
+ if(pressAction(e.code,e.repeat))e.preventDefault()});
+addEventListener('keyup',e=>{K[e.code]=false});
+addEventListener('mousedown',e=>{
+ if(KBCAP&&!(e.target.closest&&e.target.closest('button'))){e.preventDefault();kbCapture('Mouse'+e.button);return}
+ if(!G||e.target.closest&&e.target.closest('button')||e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;if(!locked){lockPointer();return}
+ const code='Mouse'+e.button;
+ if(deadView()){if(isKey(code,'freecam')){SPEC.free=!SPEC.free;SPEC.fc=null}else specCycle(e.button===2?-1:1);return}
+ K[code]=true;pressAction(code,false)});
+addEventListener('mouseup',e=>{K['Mouse'+e.button]=false});
+addEventListener('contextmenu',e=>e.preventDefault());
+// v8 mouse spike filter: Chromium pointer-lock occasionally reports a single huge movementX/Y (hundreds of px) that the
+// player never made -> a hard 'flick' while tracking. Drop a sample that is far above the recent average (real fast flicks build up over several events).
+const MSF={avg:20,n:0,drop:0};function mouseFilt(e){const mx=e.movementX||0,my=e.movementY||0,m=Math.hypot(mx,my);const lim=Math.max(180,MSF.avg*8);
+ if(m>lim&&MSF.n<2){MSF.n++;MSF.drop++;window.__mDrop=MSF.drop;return [0,0]}MSF.n=0;MSF.avg=MSF.avg*.85+Math.min(m,lim)*.15;return [mx,my]}
+addEventListener('mousemove',e=>{if(!locked||!G)return;const me=G.P[ME];const [MX,MY]=mouseFilt(e);
+ if(deadView()){SPEC.fy-=MX*.0022*settings.sens;SPEC.fp=Math.max(-1.5,Math.min(1.5,SPEC.fp-MY*.0022*settings.sens));return}
+ if(!me.alive||G.rs==='over'||G.rs==='mapvote')return;const z=me.adsAmt>.5?camera.fov/75:1;const dy=MY*.0022*settings.sens*z;me.yaw-=MX*.0022*settings.sens*z;me.pitch=Math.max(-1.5,Math.min(1.5,me.pitch-dy));
+ if(dy>0&&me.rcAcc>0)me.rcAcc=Math.max(0,me.rcAcc-dy)});
+function lockPointer(){ac();try{const r=renderer.domElement.requestPointerLock();if(r&&r.catch)r.catch(()=>{})}catch(e){}}
+let wasLocked=false;
+document.addEventListener('pointerlockchange',()=>{locked=document.pointerLockElement===renderer.domElement;if(locked){wasLocked=true;$('#pause').classList.add('hide')}else if(G&&wasLocked&&!CHAT.open){$('#pause').classList.remove('hide');for(const k in K)K[k]=false}});
+function localInput(){const me=G.P[ME];
+ if(AUTOPLAY)return botThink(me,1/60);
+ if(CHAT.open)return {f:0,r:0};
+ const inp={f:(down('forward')?1:0)-(down('back')?1:0),r:(down('right')?1:0)-(down('left')?1:0),jump:down('jump'),sprint:down('sprint'),steady:down('steady'),crouch:down('crouch'),fire:down('fire')||!!window.__forceFire,ads:down('ads')||!!window.__forceADS,reload:down('reload'),util:down('util'),lethal:down('util'),tactical:down('tactical'),ping:down('ping'),melee:down('melee')||!!window.__forceMelee};
+ inp.tac=(TACS||down('tacsprint'))&&inp.sprint||!!window.__forceTac;if(window.__forceSprint){inp.sprint=true;inp.f=1}if(window.__forceSlide&&!me.slideT){inp.crouch=true}
+ if(MELSEL){inp.melee=inp.melee||inp.fire;inp.fire=false;inp.ads=false}
+ if(gunTuck(me)>.55){inp.fire=false;inp.ads=false}// v6 wall-tuck: barrel pressed into a wall -> no fire/ADS (melee still works)
+ if(swReq!==undefined){inp.sw=swReq;swReq=undefined}return inp}
+// scroll wheel: primary -> secondary -> melee, debounced, with a short switch animation
+function cycleWeapon(d){if(!G)return;const me=G.P[ME];if(!me.alive)return;const now=performance.now();if(now-WHL<140)return;WHL=now;window.__wsT=now;const order=[0,1,2];let i=MELSEL?2:me.cur;i=(i+d+3)%3;MELSEL=i===2;if(!MELSEL)swReq=i;VK.swA=.25;SND.ui(MELSEL?420:520);window.__wsel=i}
+addEventListener('wheel',e=>{if(KBCAP){e.preventDefault();kbCapture(e.deltaY<0?'WheelUp':'WheelDown');return}if(e.target&&e.target.closest&&e.target.closest('#menu,#pause,#reel,#lobby,.modal'))return;/*v8: never steal the wheel from menus*/if(!G||!locked&&!AUTOPLAY&&!window.__lk)return;let c=e.deltaY<0?'WheelUp':'WheelDown';if(settings.invScroll)c=c==='WheelUp'?'WheelDown':'WheelUp';pressAction(c,false)},{passive:false});
+// ---- keybind menu
+let kbFrom='menu';
+function kbRender(){const cf=kbConflicts();$('#kbTable').innerHTML=KB_ACTIONS.map(([a,l])=>`<tr><td>${l}</td><td><button class="sm kbb${cf[a]?' bad':''}${KBCAP===a?' cap':''}" data-a="${a}">${KBCAP===a?'press a key...':keyName(kc(a))}</button></td><td style="color:#f77;font-size:12px">${cf[a]?'conflicts with '+cf[a].map(x=>KB_ACTIONS.find(k=>k[0]===x)[1]).join(', '):''}</td></tr>`).join('');
+ document.querySelectorAll('.kbb').forEach(b=>b.onclick=e=>{e.stopPropagation();KBCAP=b.dataset.a;$('#kbMsg').textContent='Press a key or mouse button for "'+KB_ACTIONS.find(k=>k[0]===KBCAP)[1]+'" (Esc cancels, Backspace clears)';kbRender()});
+ const n=Object.keys(cf).length;if(!KBCAP)$('#kbMsg').textContent=n?n+' action(s) share a key - fix the red ones':'No conflicts. Saved automatically.'}
+function kbCapture(code){const a=KBCAP;KBCAP=null;if(code==='Escape'){kbRender();return}
+ settings.keys=settings.keys||{};settings.keys[a]=code==='Backspace'?'':code;saveSettings();KBM=kbMap();kbRender()}
+function kbOpen(from){kbFrom=from;$('#'+from).classList.add('hide');$('#kbMenu').classList.remove('hide');KBCAP=null;kbRender()}
+
+// v6 gun wall-tuck: rays from the eye along the aim (centre + gun side). Returns 0..1 (1 = muzzle fully inside wall reach).
+const GUN_REACH=.85;
+function gunTuck(p){if(!p||!p.alive||!G||!G.boxes)return 0;const e=[p.pos[0],p.pos[1]+pH(p)-.15,p.pos[2]],cy=Math.cos(p.yaw),sy=Math.sin(p.yaw),cp=Math.cos(p.pitch),sp=Math.sin(p.pitch);
+ const d=[-sy*cp,sp,-cy*cp];let t=rayWorld(e,d,GUN_REACH);const o=[e[0]+cy*.17,e[1]-.12,e[2]-sy*.17];t=Math.min(t,rayWorld(o,d,GUN_REACH));
+ const v=Math.max(0,Math.min(1,(GUN_REACH-t)/(GUN_REACH-.3)));p.tuck=v;return v}

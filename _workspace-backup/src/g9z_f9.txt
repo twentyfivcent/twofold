@@ -1,0 +1,21 @@
+// ===== V8.1 (C) knife first-person hands: knife gripped by a visible RIGHT hand right of centre; empty LEFT hand clearly visible left of centre.
+// Root cause (v8d3b): the knife group sat at camera (.15,-.2,-.25) -> at that depth the grip hand projects below the screen edge, and the off hand was a child
+// of the gun viewmodel (vm) at vm(-.3,-.13,-.12) -> camera ~(-.13,-.3,-.42): low and almost centred. Both are now placed in camera space.
+const KVM={r:{x:.2,y:-.13,z:-.42},l:{x:-.2,y:-.14,z:-.42}};
+function knifeVM(kn,ml,sa,held,free,dt){const c=KVM.r;
+ // grip pose (held) blended with the stab (ml) and swing (sa) offsets of the old pose
+ kn.position.set(c.x-ml*.12,c.y+ml*.08-sa*.06,c.z-ml*.22);kn.rotation.set(-.12+ml*.3,ml*.45,-ml*.35);
+ let off=KVM.off;if(!off||off.parent!==camera){off=null;if(vm)for(const ch of vm.children)if(ch.userData&&ch.userData.offHand){off=ch;break}
+  if(off){vm.remove(off);camera.add(off);KVM.off=off}}
+ if(off){const L=KVM.l;off.visible=kn.visible&&!free&&(held||ml>0);off.position.set(L.x+ml*.03,L.y-sa*.025-ml*.03,L.z);off.rotation.set(.32,-.42,-.55)}}
+// a new viewmodel (character / team change) brings its own off hand: drop the old one from the camera
+{const _sv=setViewmodel;setViewmodel=function(){const r=_sv.apply(this,arguments);if(KVM.off&&KVM.off.parent===camera&&!(vm&&vm.children.includes(KVM.off))){/* rebuilt? */
+  let nw=null;if(vm)for(const ch of vm.children)if(ch.userData&&ch.userData.offHand)nw=ch;if(nw){camera.remove(KVM.off);KVM.off=null}}return r}}
+// camera-space test hook: NDC of the grip hand, knife handle and left hand
+window.__knifeHands=()=>{const kn=vm&&vm.userData.knife;if(!kn)return null;camera.updateMatrixWorld(true);const V=new THREE.Vector3(),B=new THREE.Box3();
+ const ndc=o=>{B.setFromObject(o);B.getCenter(V);return V.project(camera).toArray().map(v=>+v.toFixed(3))};
+ const hand=kn.children.find(c=>c.userData&&c.userData.cid||c.isGroup&&c!==kn.children[0]);const blade=kn.children[0];
+ const hp=new THREE.Vector3(.03,0,0);blade.localToWorld(hp);/* handle = first 0.1 of the blade model */const handle=hp.project(camera).toArray().map(v=>+v.toFixed(3));
+ const hd=hand?(()=>{const p=new THREE.Vector3();hand.getWorldPosition(p);return p.project(camera).toArray().map(v=>+v.toFixed(3))})():null;
+ const off=KVM.off;const ld=off?(()=>{const p=new THREE.Vector3();off.getWorldPosition(p);return p.project(camera).toArray().map(v=>+v.toFixed(3))})():null;
+ return {knifeVis:kn.visible,rightHand:hd,handle,leftHand:ld,leftVis:!!(off&&off.visible),gripDist:hd&&+Math.hypot(hd[0]-handle[0],hd[1]-handle[1]).toFixed(3)}};

@@ -1,0 +1,15 @@
+// ===== V8.1 (A2) exposure / bloom balance for the v8 Med/High pipeline.
+// Root cause: Med/High render HDR (NoToneMapping into a half-float target) + RoomEnvironment IBL on top of the same hemi/ambient/sun the Low look was tuned for,
+// then UnrealBloom with threshold .9 — on sun-lit sand/snow/marble almost every pixel is > .9 linear, so bloom smears a bright haze over the whole frame
+// and the final ACES exposure (.86, same as Low) washes highlights out. Fix: bloom only real highlights (threshold above diffuse white), trim IBL ambient,
+// and a per-map exposure trim (measured against the Low look) applied in the final pass.
+const A2={thr:1.35,str:.3,rad:.5,exp:{_:.86},env:.6};
+A2.exp=Object.assign({_:.86},{'Coral Point':.8});
+function a2Apply(){try{if(bloomPass){bloomPass.threshold=A2.thr;bloomPass.strength=A2.str;bloomPass.radius=A2.rad}
+ if(typeof finalPass!=='undefined'&&finalPass&&finalPass.uniforms&&finalPass.uniforms.exposure){const n=G&&G.mapDef&&G.mapDef.n;const e=(n&&A2.exp[n])||A2.exp._;finalPass.uniforms.exposure.value=e}
+ if(scene&&scene.environment&&G&&G.mapDef&&!A2._envDone){}}catch(e){}}
+{const _aq=applyQuality;applyQuality=function(){const r=_aq.apply(this,arguments);a2Apply();return r}}
+{const _bm=buildMap;buildMap=function(){const r=_bm.apply(this,arguments);a2Apply();return r}}
+// IBL is extra ambient on top of the map's hemi/ambient: scale it so Med/High don't lift every surface
+{const _mt=matT;matT=function(c,t,o){const m=_mt(c,t,o);if(m&&m.__gfx&&!m.__a2){m.__a2=1;m.envMapIntensity=(m.envMapIntensity==null?1:m.envMapIntensity)*A2.env}return m}}
+window.__a2=A2;window.__a2Apply=a2Apply;

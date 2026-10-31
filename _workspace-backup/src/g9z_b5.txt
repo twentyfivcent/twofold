@@ -1,0 +1,16 @@
+// ===================== v7 BATCH 5: menu online count =====================
+// '● N online' under the TWOFOLD header. heartbeat(per-tab uuid) every 30s, online_count() every 30s while the menu shows.
+// Any Supabase failure (offline, no setup, missing RPC) hides the line; it reappears on the next good poll.
+const ONLINE={id:(()=>{try{return crypto.randomUUID()}catch(e){return 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g,()=>(Math.random()*16|0).toString(16))}})(),n:-1,t:null,el:null};
+function onlineEl(){if(ONLINE.el)return ONLINE.el;const h=document.querySelector('#menu .ptitle')||document.querySelector('.ptitle');if(!h)return null;const d=document.createElement('div');d.id='onlineCount';d.style.display='none';
+ d.innerHTML='<i></i><b></b> online';h.appendChild(d);return ONLINE.el=d}
+async function onlineTick(){const el=onlineEl();let sb=null;try{sb=typeof ACC!=='undefined'&&ACC.sb&&ACC.status!=='nosetup'&&ACC.status!=='offline'?ACC.sb:null}catch(e){}
+ if(!sb){if(el)el.style.display='none';return}
+ try{const h=await sb.rpc('heartbeat',{p_client_id:ONLINE.id});if(h&&h.error)throw h.error;const c=await sb.rpc('online_count');if(c.error||typeof c.data!=='number')throw c.error||'bad';ONLINE.n=Math.max(1,c.data);
+  if(el){el.querySelector('b').textContent=ONLINE.n;el.style.display=''}}catch(e){ONLINE.n=-1;if(el)el.style.display='none'}}
+function onlineStart(){if(ONLINE.t)return;setTimeout(onlineTick,1500);ONLINE.t=setInterval(onlineTick,30000)}
+window.__online=ONLINE;window.__onlineTick=onlineTick;
+document.head.insertAdjacentHTML('beforeend',`<style>#onlineCount{margin-top:6px;font-size:11px;letter-spacing:2px;font-weight:600;color:#9fe3b0;text-transform:uppercase;display:flex;align-items:center;gap:6px}
+#onlineCount i{width:8px;height:8px;border-radius:50%;background:#3ddc6a;box-shadow:0 0 6px #3ddc6a;animation:onlp 2.4s ease-in-out infinite}#onlineCount b{color:#e8fff0;font-weight:800}
+@keyframes onlp{0%,100%{opacity:1}50%{opacity:.45}}</style>`);
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',onlineStart);else onlineStart();

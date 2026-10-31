@@ -1,0 +1,31 @@
+// ===================== v7 GUN BALANCE =====================
+// every change recorded as V7CHG['gun.field']=[old,new] so tests/reports can print exact numbers
+const V7CHG={};function v7set(id,k,v){const w=W[id];V7CHG[id+'.'+k]=[Array.isArray(w[k])?w[k].slice():w[k],Array.isArray(v)?v.slice():v];w[k]=v}
+// wall penetration: metres of solid cover a round can punch through (shown as cm "PEN" in the UI). Projectiles (crossbow, launcher) = 0.
+const PEN_CLS={'Pistol':.2,'Hand Cannon':.45,'Long Revolver':.45,'Derringer':.2,'Dual Pistols':.15,'Auto Pistol':.15,'Machine Pistol':.15,'Burst Pistol':.2,
+ 'Compact SMG':.2,'SMG':.25,'Heavy SMG':.3,'PDW':.3,'Burst SMG':.25,'Carbine':.4,'Assault Rifle':.45,'Burst Rifle':.45,'Bullpup Burst':.45,'Battle Rifle':.6,
+ 'LMG':.6,'Rotary LMG':.5,'Marksman Rifle':.6,'Lever Rifle':.55,'Semi-auto Sniper':.8,'Bolt Sniper':.9,'Heavy Sniper':1.2,'Charge Rifle':1.5,
+ 'Pump Shotgun':.1,'Auto Shotgun':.1,'Double-barrel':.1,'Semi-auto Shotgun':.1,'Sawed-off':.1,'Launcher':0,'Crossbow':0};
+for(const id in W){const w=W[id];w.pen=w.mode==='launch'||w.mode==='xbow'?0:(PEN_CLS[w.cls]!==undefined?PEN_CLS[w.cls]:.3)}
+function penCm(w){return Math.round((w.pen||0)*100)}
+// tighter shotgun spread (-28%)
+for(const id in W){const w=W[id];if(w.pellets){v7set(id,'sp',+(w.sp*.72).toFixed(3));v7set(id,'ads',+(w.ads*.72).toFixed(3))}}
+// only bolt-action snipers one-shot to the head; semi-auto snipers/marksman keep the hip-fire penalty but heads cap at 92
+for(const id of ['lancet','osprey','stilt']){const w=W[id];v7set(id,'hs1',0);w.hipPen=1;const dm=w.dm.slice();dm[0]=Math.min(dm[0],92);v7set(id,'dm',dm);DMG[id]=w.dm}
+W.stilt.d='Semi-auto sniper on a bipod: two body shots or a headshot plus any hit. Only bolt-actions one-shot.';
+W.lancet.d='Semi-auto marksman rifle: 2 body shots, pinpoint when aimed.';
+// Corvid Arc -> railgun: slower charge, full charge one-shots body and head, punches through cover
+v7set('corvid','ct',1.25);v7set('corvid','dm',[200,120,90]);DMG.corvid=W.corvid.dm;v7set('corvid','dmg',120);v7set('corvid','dmin',112);v7set('corvid','rpm',50);W.corvid.pen=1.5;V7CHG['corvid.pen']=[0,1.5];
+W.corvid.d='Railgun: hold fire to charge (1.25s), release for a piercing slug. Full charge kills with a body or head hit and punches through cover.';W.corvid.rail=1;
+// Cinder Spool: gatling spin-up (fires from 25% spin, rate ramps 30%->100% over .65s, spins down over .9s)
+W.cinder.spinUp=.65;W.cinder.spinDown=.9;V7CHG['cinder.spinUp']=[0,.65];W.cinder.d='Rotary LMG: hold fire to spin up - starts slow, ramps to 900 RPM. Very slow to move.';
+// projectiles
+const XBOW_V=104,KNIFE_V=44,KNIFE_G=13,PAD_UP=16.5;V7CHG['thistle.boltSpeed']=[80,XBOW_V];V7CHG['knife.speed']=[30,KNIFE_V];V7CHG['knife.gravity']=[6,KNIFE_G];V7CHG['pad.launchVy']=[12.5,PAD_UP];
+
+// ===================== V8 drop 1: global -4% gun damage (Tyler) =====================
+// every head/body/limb value x0.96, but any value that was a one-shot (>=100) stays >=100 so defining one-shots survive
+// (snipers to the head, crossbow head+body, shotgun point-blank, knife=200, hs1 weapons=999 untouched). Logged in V7CHG as 'id.dm'.
+const V8_DMG_MUL=.96;
+for(const k in W){const w=W[k];if(!w.dm||k==='knife')continue;const o=w.dm.slice();const n=o.map(v=>{const r=Math.round(v*V8_DMG_MUL);return v>=100?Math.max(100,r):r});w.dm=n;if(typeof DMG!=='undefined'&&DMG[k])DMG[k]=n;V7CHG[k+'.dm(v8)']=[o,n.slice()]}
+// crossbow: a bolt to the head OR chest always kills (enforced again in damage() so perks/multipliers can never break it)
+W.thistle.dm[0]=Math.max(W.thistle.dm[0],160);W.thistle.dm[1]=Math.max(W.thistle.dm[1],105);W.thistle.d='Silent bolt with real drop and travel time. One-shot to the head or chest, reload after every shot.';

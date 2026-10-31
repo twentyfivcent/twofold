@@ -1,0 +1,1 @@
+cd /workspace/arena-fps; D=/home/box/twofold-backup; mkdir -p $D/src $D/logs; cp V81_PROGRESS.md index.html index.v81.bak.html twofold-v8.1.zip v81.js v8d2.js v8d3b.js build.py $D/ 2>/dev/null; cp tools/*.sh $D/; cp src/*.txt $D/src/; cp logs/f_* $D/logs/ 2>/dev/null; true

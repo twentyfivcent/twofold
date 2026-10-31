@@ -1,0 +1,85 @@
+// ===================== MENU WIRING =====================
+$('#nameIn').value=settings.name;$('#nameIn').oninput=e=>{if(ACC.acctName())return;settings.name=e.target.value.slice(0,16)||'Player';saveSettings()};
+$('#pMap').innerHTML='<option value="-1">Random map</option>'+MAPS.map((m,i)=>`<option value="${i}">${m.n} - ${m.era}</option>`).join('');
+function syncSens(){for(const [a,b] of [['#sensIn','#sensV'],['#sensIn2','#sensV2']]){$(a).value=settings.sens;$(b).textContent=(+settings.sens).toFixed(2)}}
+for(const s of ['#sensIn','#sensIn2'])$(s).oninput=e=>{settings.sens=+e.target.value;saveSettings();syncSens()};syncSens();
+if(settings.vol===undefined)settings.vol=.7;function syncVol(){for(const [a,b] of [['#volIn','#volV'],['#volIn2','#volV2']]){$(a).value=settings.vol;$(b).textContent=Math.round(settings.vol*100)+'%'}}
+for(const s of ['#volIn','#volIn2'])$(s).oninput=e=>{settings.vol=+e.target.value;saveSettings();syncVol();ac();SND.ui(600)};syncVol();
+$('#dnIn').checked=settings.dmgNums!==false;$('#dnIn').onchange=e=>{settings.dmgNums=e.target.checked;saveSettings()};
+document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('button')){ac();SND.ui()}});
+if(!settings.botDiff)settings.botDiff='normal';$('#diffSel').value=settings.botDiff;$('#diffSel').onchange=e=>{settings.botDiff=e.target.value;saveSettings()};
+let xhFrom='menu',xhAnim=0;
+function xhSync(){const c=xhCfg();$('#xhStyle').value=c.style;$('#xhHex').value=c.color;for(const [id,k,f] of [['xhSize','size',v=>v+'px'],['xhThick','thick',v=>v+'px'],['xhGap','gap',v=>v+'px'],['xhOp','opacity',v=>Math.round(v*100)+'%']]){$('#'+id).value=c[k];$('#'+id+'V').textContent=f(c[k])}$('#xhOutline').checked=c.outline;$('#xhDyn').checked=c.dynamic;
+ document.querySelectorAll('.xhp').forEach(b=>b.style.borderColor=b.dataset.c.toLowerCase()===c.color.toLowerCase()?'#fff':'#fff3')}
+function xhSet(k,v){settings.xh=Object.assign(xhCfg(),{[k]:v});saveSettings();xhSync()}
+$('#xhPresets').innerHTML=XH_PRESETS.map(c=>`<button class="xhp" data-c="${c}" style="background:${c}"></button>`).join('');
+document.querySelectorAll('.xhp').forEach(b=>b.onclick=()=>xhSet('color',b.dataset.c));
+$('#xhHex').oninput=e=>{const v=e.target.value.trim();if(/^#[0-9a-fA-F]{6}$/.test(v)){settings.xh=Object.assign(xhCfg(),{color:v});saveSettings();document.querySelectorAll('.xhp').forEach(b=>b.style.borderColor=b.dataset.c.toLowerCase()===v.toLowerCase()?'#fff':'#fff3')}};
+$('#xhStyle').onchange=e=>xhSet('style',e.target.value);
+for(const [id,k] of [['xhSize','size'],['xhThick','thick'],['xhGap','gap'],['xhOp','opacity']])$('#'+id).oninput=e=>xhSet(k,+e.target.value);
+$('#xhOutline').onchange=e=>xhSet('outline',e.target.checked);$('#xhDyn').onchange=e=>xhSet('dynamic',e.target.checked);
+$('#xhReset').onclick=()=>{delete settings.xh;saveSettings();xhSync()};
+function xhOpen(from){xhFrom=from;$('#'+from).classList.add('hide');$('#xhMenu').classList.remove('hide');xhSync();const loop=t=>{if($('#xhMenu').classList.contains('hide'))return;const c=xhCfg();drawXH($('#xhPrev'),c,c.dynamic?Math.round((Math.sin(t/260)+1)*5):0);xhAnim=requestAnimationFrame(loop)};requestAnimationFrame(loop)}
+$('#bXh').onclick=()=>xhOpen('menu');$('#bXh2').onclick=()=>xhOpen('pause');
+$('#xhBack').onclick=()=>{$('#xhMenu').classList.add('hide');$('#'+xhFrom).classList.remove('hide')};
+// keybinds, graphics, gore, lobby settings
+$('#bKeys').onclick=()=>kbOpen('menu');$('#bKeys2').onclick=()=>kbOpen('pause');
+$('#kbBack').onclick=()=>{KBCAP=null;$('#kbMenu').classList.add('hide');$('#'+kbFrom).classList.remove('hide')};
+$('#kbReset').onclick=()=>{delete settings.keys;saveSettings();KBM=kbMap();KBCAP=null;kbRender()};
+function syncGfx(){document.querySelectorAll('.qSel').forEach(e=>e.value=settings.quality);document.querySelectorAll('.goreIn').forEach(e=>e.checked=!!settings.gore)}
+document.querySelectorAll('.qSel').forEach(e=>e.onchange=()=>{settings.quality=e.value;saveSettings();syncGfx();applyQuality()});
+document.querySelectorAll('.goreIn').forEach(e=>e.onchange=()=>{settings.gore=e.checked;saveSettings();syncGfx()});
+syncGfx();applyQuality();
+function syncInv(){document.querySelectorAll('.invScr').forEach(e=>e.checked=!!settings.invScroll)}document.querySelectorAll('.invScr').forEach(e=>e.onchange=()=>{settings.invScroll=e.checked;saveSettings();syncInv()});syncInv();
+// pause menu navigation + settings tabs
+document.querySelectorAll('.pn[data-p]').forEach(b=>b.onclick=()=>{document.querySelectorAll('.pn').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.ppage').forEach(p=>p.classList.toggle('hide',p.id!==b.dataset.p));if(b.dataset.p==='pHome')lockPointer()});
+document.querySelectorAll('.pt').forEach(b=>b.onclick=()=>{document.querySelectorAll('.pt').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.ptab').forEach(p=>p.classList.toggle('hide',p.id!==b.dataset.t))});
+$('#dnIn2').checked=settings.dmgNums!==false;$('#dnIn2').onchange=e=>{settings.dmgNums=e.target.checked;$('#dnIn').checked=e.target.checked;saveSettings()};
+function pauseTick(){if(!$('#pause').classList.contains('hide')&&G){if(!$('#pScore').classList.contains('hide'))$('#pSb').innerHTML=$('#sb').innerHTML||'';$('#pInfo').innerHTML=`<div class="prow"><span>Map</span><b>${G.mapDef.n}</b></div><div class="prow"><span>Score</span><b>${G.sc[0]} - ${G.sc[1]}</b></div><div class="prow"><span>Voice</span><b>${VOICE.st==='on'?'mic ready':VOICE.st==='nomic'?'listen-only (no mic)':'off'}</b></div>`;$('#vcStat').textContent='Voice status: '+VOICE.st}}
+setInterval(pauseTick,300);
+$('#lMap').onchange=e=>{if(LOBBY&&LOBBY.host&&!LOBBY.qp){LOBBY.map=+e.target.value;broadcastLobby()}};
+$('#lFF').onchange=e=>{if(LOBBY&&LOBBY.host){LOBBY.ff=e.target.checked;broadcastLobby()}};
+setTimeout(makeIcons,200);
+validateMaps();
+const BOT_NAMES=["Bot Ash", "Bot Vex", "Bot Rook", "Bot Moss", "Bot Pike", "Bot Wren", "Bot Flint", "Bot Sable", "Bot Juno", "Bot Quill", "Bot Rune", "Bot Echo", "Bot Talon", "Bot Brick", "Bot Cinder", "Bot Drift", "Bot Ember", "Bot Frost", "Bot Gale", "Bot Haze", "Bot Iris", "Bot Jinx", "Bot Kestrel", "Bot Lark", "Bot Mako", "Bot Nova", "Bot Onyx", "Bot Pip", "Bot Quartz", "Bot Rift", "Bot Slate", "Bot Thorn", "Bot Umber", "Bot Vale", "Bot Wisp", "Bot Yarrow", "Bot Zephyr", "Bot Briar", "Bot Cobalt", "Bot Dusk", "Bot Fennel", "Bot Grit", "Bot Hollow", "Bot Indigo", "Bot Jett", "Bot Knox", "Bot Lumen", "Bot Marrow", "Bot Nettle", "Bot Oak", "Bot Pyre", "Bot Sparrow", "Bot Tundra", "Bot Vesper", "Bot Wick", "Bot Ajax", "Bot Basil", "Bot Clove", "Bot Dune", "Bot Elm", "Bot Fable", "Bot Gully", "Bot Hatch", "Bot Ivo", "Bot Jasper", "Bot Koda", "Bot Loch", "Bot Mirth", "Bot Nash", "Bot Orrin", "Bot Pell", "Bot Ronan", "Bot Sage", "Bot Tamsin", "Bot Ulric", "Bot Vance", "Bot Wade", "Bot Xeno", "Bot Yuki", "Bot Zane", "Bot Axel", "Bot Bram", "Bot Cass", "Bot Dax", "Bot Esme", "Bot Finch", "Bot Greer", "Bot Holt", "Bot Ines", "Bot Jory", "Bot Kip", "Bot Lyle", "Bot Mabel", "Bot Nico", "Bot Otto", "Bot Perrin", "Bot Quinn", "Bot Remy", "Bot Sol", "Bot Tova", "Bot Uma", "Bot Voss", "Bot Wynn", "Bot Arlo", "Bot Bo", "Bot Cyrus", "Bot Delia", "Bot Eno", "Bot Flick", "Bot Gus", "Bot Hale", "Bot Ike", "Bot Joss", "Bot Kai", "Bot Lux", "Bot Milo", "Bot Ned", "Bot Odin", "Bot Pax", "Bot Rex", "Bot Sully", "Bot Tex", "Bot Vito", "Bot Wolf", "Bot Zed", "RiftHQ", "MarrowHQ", "Nettle99", "Ember_tv", "MakoJr", "KipGg", "Wren99", "Rune42", "FrostGg", "Thorn_x", "Arlo99", "Jasper_tv", "Onyx42", "SparrowGg", "Cass_x", "Moss42", "Dune42", "HatchPro", "FlickJr", "OakHQ", "Ivo_x", "Tamsin_x", "Sully99", "IkeJr", "EchoJr", "Eno42", "ZedGg", "RemyPro", "Rook_x", "JoryJr", "WispPro", "Loch99", "TundraGg", "FableJr", "VitoGg", "Cinder_tv", "EsmePro", "ValeJr", "TalonGg", "JunoPro"];
+function pickBotNames(n){const a=BOT_NAMES.slice(),o=[];while(o.length<n&&a.length){o.push(a.splice(Math.floor(Math.random()*a.length),1)[0])}return o}
+const PRAC_SLOTS=pickBotNames(3).map(n=>({name:n,bot:true}));
+function pracSlot(n,me){return `<div class="slot"><span>${esc0(n)}</span><span style="color:${me?'#7fd0ff':'#9ab'}">${me?'YOU':'BOT'}</span></div>`}
+function esc0(t){return String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function showPracSetup(){{const nn=pickBotNames(3);PRAC_SLOTS.forEach((x,i)=>x.name=nn[i])}$('#pt0').innerHTML=pracSlot(myName(),1)+pracSlot(PRAC_SLOTS[0].name);$('#pt1').innerHTML=pracSlot(PRAC_SLOTS[1].name)+pracSlot(PRAC_SLOTS[2].name);$('#pDiff').value=$('#diffSel').value;$('#menu').classList.add('hide');$('#pracSetup').classList.remove('hide')}
+function hidePracSetup(){$('#pracSetup').classList.add('hide');$('#menu').classList.remove('hide')}
+$('#pDiff').onchange=e=>{$('#diffSel').value=e.target.value;$('#diffSel').dispatchEvent(new Event('change'))};
+$('#bPBack').onclick=hidePracSetup;
+$('#bPStart').onclick=()=>{$('#pracSetup').classList.add('hide');practice(+$('#pMap').value)};
+function practice(map){if(map===undefined)map=-1;if(!(map>=0))map=Math.floor(Math.random()*MAPS.length);cleanupNet();
+ startGame({map,me:0,host:true,slots:[{name:myName(),bot:false},...pickBotNames(3).map(n=>({name:n,bot:true}))]});if(G)G.practice=true}
+$('#bPractice').onclick=()=>showPracSetup();
+$('#bHost').onclick=()=>hostOnline();$('#bQuick').onclick=()=>MM.start();$('#mmCancel').onclick=()=>MM.cancel();
+$('#bJoin').onclick=()=>joinOnline($('#codeIn').value);
+$('#codeIn').onkeydown=e=>{if(e.key==='Enter')joinOnline($('#codeIn').value)};
+$('#bCopy').onclick=()=>{const t=LOBBY&&LOBBY.code;if(!t)return;const fb=()=>{const i=document.createElement('textarea');i.value=t;document.body.appendChild(i);i.select();try{document.execCommand('copy')}catch(e){}i.remove();lobbyMsg('Code copied: '+t)};if(navigator.clipboard)navigator.clipboard.writeText(t).then(()=>lobbyMsg('Code copied: '+t)).catch(fb);else fb()};
+$('#bSwitch').onclick=()=>{if(!LOBBY)return;if(LOBBY.host){const s=LOBBY.me,n=freeSlot(s<2?1:0);if(n>=0){LOBBY.slots[n]=LOBBY.slots[s];LOBBY.slots[s]=null;LOBBY.me=n;broadcastLobby()}else lobbyMsg('That team already has 2 players.')}else netSend(hostConn,{t:'switch'})};
+$('#bStart').onclick=hostStartMatch;
+$('#bLeave').onclick=()=>quitToMenu('');
+$('#bResume').onclick=()=>lockPointer();
+$('#bQuit').onclick=()=>quitToMenu('');
+addEventListener('beforeunload',()=>cleanupNet());
+requestAnimationFrame(frame);
+v6MenuInit();
+window.__api={simDrop(){const c=hostConn;if(c)c.close()},get NETTOK(){return NETTOK},sendChat,hostChat,castMapVote,hostNextMatch,resetAim,kbOpen,applyQuality,checkSpawns,voiceIds,get VOICE(){return VOICE},get CHATLOG(){return CHATLOG},fireShot,hostOnline,joinOnline,hostStartMatch,quitToMenu,W,MAPS,UT,castVote,validateMaps,hitScan,partBoxes,specCycle,hostAction,practice,showPracSetup,damage,equip,roundStart,navPath,buildNav,makeIcons,ICON,xhCfg,drawXH,get SPEC(){return SPEC},get LIFE(){return LIFE},get G(){return G},get LOBBY(){return LOBBY},get ME(){return ME}};
+if(Q.has('practice'))practice(Q.has('map')?+Q.get('map'):undefined);
+(function(){const r=settings.relay=settings.relay||{mode:'off'};const ids={rMode:'mode',rApp:'app',rKey:'key',rUrl:'url',rUser:'user',rCred:'cred'};
+ for(const k in ids)$('#'+k).value=r[ids[k]]||(k==='rMode'?'off':'');
+ const vis=()=>{const m=$('#rMode').value;$('#rMet').style.display=m==='metered'?'':'none';$('#rMan').style.display=m==='manual'?'':'none'};vis();$('#rMode').onchange=vis;
+ $('#bRelay').onclick=()=>$('#relayBox').classList.toggle('hide');
+ $('#rSave').onclick=()=>{for(const k in ids)r[ids[k]]=$('#'+k).value.trim();relayCache=null;saveSettings();$('#rStat').textContent=relayOn()?'Saved - relay ON':'Saved - relay off'};
+ $('#rTest').onclick=async()=>{$('#rSave').onclick();if(!relayOn())return;$('#rStat').textContent='Testing...';try{const ice=await getIce();const pc=new RTCPeerConnection({iceServers:ice.iceServers,iceTransportPolicy:'relay'});pc.createDataChannel('t');let ok=false;
+  pc.onicecandidate=e=>{if(e.candidate&&/ typ relay/.test(e.candidate.candidate)&&!ok){ok=true;$('#rStat').textContent='Relay works (got a relay candidate)';pc.close()}};
+  await pc.setLocalDescription(await pc.createOffer());setTimeout(()=>{if(!ok){$('#rStat').textContent='No relay candidate - check credentials';pc.close()}},8000)}catch(e){$('#rStat').textContent='Failed: '+e.message}};
+})();
+// v8: full pause in Practice vs Bots. While the pause menu is open the whole sim stops (host tick, bots, round timer, nades, physics)
+// and game audio is suspended. Online matches never pause.
+function pracPaused(){return !!(G&&G.practice&&HOST&&!conns().length&&!$('#pause').classList.contains('hide'))}
+setInterval(()=>{try{const p=pracPaused();if(p!==pracPaused.last){pracPaused.last=p;if(typeof AC!=='undefined'&&AC){if(p&&AC.state==='running')AC.suspend();else if(!p&&AC.state==='suspended')AC.resume()}
+ const h=document.querySelector('#pHome .sub');if(h)h.textContent=p?'Practice is fully paused - bots, timers and grenades are frozen. Click Resume to continue.':'The match keeps running for everyone else. Click Resume (or press it again) to recapture the mouse.'}}catch(e){}},100);
+</script></body></html>

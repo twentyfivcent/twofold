@@ -1,0 +1,13 @@
+// ===== V8.1 (J) match-start stutter: three r128 compiles a shader program the first time a material/define combo is drawn (players, viewmodels,
+// shadow depth, post FX), which landed in the first seconds of play. During the load we now draw one warm-up frame with EVERY object in the
+// scene forced visible (incl. hidden weapon models, effects, shadow casters), so all programs and textures are ready before play starts.
+function warmScene(tag){if((!G&&tag!=='pan')||!renderer||!scene)return 0;const a=performance.now();const hid=[];
+ try{scene.traverse(o=>{if(o.visible===false){hid.push(o);o.visible=true}});if(camera&&camera.parent!==scene&&camera.children.length)camera.traverse(o=>{if(o.visible===false){hid.push(o);o.visible=true}});
+  const fc=[];scene.traverse(o=>{if(o.isMesh&&o.frustumCulled){fc.push(o);o.frustumCulled=false}});
+  try{if(renderer.compile)renderer.compile(scene,camera)}catch(e){}
+  const sm=renderer.shadowMap&&renderer.shadowMap.enabled;if(sm)renderer.shadowMap.needsUpdate=true;
+  try{renderer.render(scene,camera);const gl=renderer.getContext&&renderer.getContext();if(gl){const px=new Uint8Array(4);gl.readPixels(0,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,px)}/* force the GPU/ANGLE shader compile now, inside the load, not on the first match frame */}catch(e){}
+  for(const o of fc)o.frustumCulled=true}catch(e){}
+ for(const o of hid)o.visible=false;const ms=performance.now()-a;(window.__warm=window.__warm||[]).push({tag,ms:Math.round(ms),objs:hid.length});return ms}
+{const _sg=startGame;startGame=function(cfg){const r=_sg.apply(this,arguments);try{if(G&&typeof podWarm==='function'&&G.P.every((p,i)=>pMeshes[i])){G._podWarm=1;podWarm()}warmScene('start');if(typeof renderFrame==='function'){try{renderFrame()}catch(e){}}}catch(e){}return r}}
+// the podium pre-warm (v8 drop) used to run from a timer in the first seconds of play; it now runs inside the load above.

@@ -1,0 +1,39 @@
+// ===================== AUDIO (all synthesized with WebAudio) =====================
+let AC=null;function ac(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(AC&&AC.state==='suspended')AC.resume().catch(()=>{});return AC}
+const SND={m:null,nb:null,
+ rdy(){const a=AC;if(!a||a.state!=='running')return null;if(!SND.m){SND.m=a.createGain();SND.m.connect(a.destination);const b=a.createBuffer(1,a.sampleRate,a.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;SND.nb=b}SND.m.gain.value=settings.vol===undefined?.7:+settings.vol;return a},
+ out(pos,vol){const a=SND.rdy();if(!a)return null;const g=a.createGain();let v=vol;
+  if(pos&&G){const L=camera.position;const dx=pos[0]-L.x,dy=pos[1]-L.y,dz=pos[2]-L.z,d=Math.hypot(dx,dy,dz);if(d>80)return null;v*=1/(1+d*.11);
+   if(a.createStereoPanner){const pn=a.createStereoPanner();const y=camera.rotation.y;pn.pan.value=Math.max(-1,Math.min(1,(dx*Math.cos(y)-dz*Math.sin(y))/(d||1)))*.85;g.connect(pn);pn.connect(SND.m)}else g.connect(SND.m)}else g.connect(SND.m);
+  g.gain.value=v;return g},
+ nz(dst,t0,dur,type,f,q,v,dec){const a=AC;const s=a.createBufferSource();s.buffer=SND.nb;const fl=a.createBiquadFilter();fl.type=type;fl.frequency.value=f;fl.Q.value=q||1;const e=a.createGain();e.gain.setValueAtTime(v,t0);e.gain.exponentialRampToValueAtTime(.001,t0+dur);s.connect(fl);fl.connect(e);e.connect(dst);s.start(t0,Math.random()*.5);s.stop(t0+dur+.02)},
+ tn(dst,t0,f0,f1,dur,type,v){const a=AC;const o=a.createOscillator();o.type=type||'sine';o.frequency.setValueAtTime(f0,t0);o.frequency.exponentialRampToValueAtTime(Math.max(20,f1),t0+dur);const e=a.createGain();e.gain.setValueAtTime(v,t0);e.gain.exponentialRampToValueAtTime(.001,t0+dur);o.connect(e);e.connect(dst);o.start(t0);o.stop(t0+dur+.02)},
+ cls(w){const c=w.cls;if(/Crossbow/.test(c))return 'launch';if(/Pistol|Cannon|Sawed|Dual|Revolver|Derringer/.test(c))return /Sawed/.test(c)?'shotgun':'pistol';if(/SMG|PDW/.test(c))return 'smg';if(/Shotgun|Double/.test(c))return 'shotgun';if(/Sniper/.test(c))return 'sniper';if(/Marksman|Lever/.test(c))return 'dmr';if(/LMG/.test(c))return 'lmg';if(/Launcher/.test(c))return 'launch';return 'rifle'},
+ shot(w,pos){try{const g=SND.out(pos,pos?1:.55);if(!g)return;const t=AC.currentTime,k=SND.cls(w);
+  const P={pistol:[2600,.12,150,.5],smg:[3200,.09,180,.4],rifle:[2200,.16,110,.6],dmr:[1600,.25,90,.8],sniper:[1100,.45,60,1],shotgun:[1300,.3,70,.9],lmg:[1900,.18,100,.65],launch:[600,.25,80,.6]}[k];
+  SND.nz(g,t,P[1],'lowpass',P[0],.7,P[3],1);SND.tn(g,t,P[2]*1.6,P[2]*.5,P[1]*.9,'triangle',P[3]*.8);if(k==='sniper'||k==='dmr')SND.nz(g,t+.05,P[1]*1.6,'bandpass',500,.6,P[3]*.25);
+  if(w.mode==='pump'||w.mode==='bolt')setTimeout(()=>{const g2=SND.out(pos,.5);if(g2){const t2=AC.currentTime;SND.nz(g2,t2,.05,'highpass',2500,2,.4);SND.nz(g2,t2+.12,.05,'highpass',1800,2,.4)}},w.mode==='bolt'?450:300)}catch(e){}},
+ reload(w){try{const g=SND.out(null,.5);if(!g)return;const t=AC.currentTime,r=w.rel;SND.nz(g,t+.1,.04,'highpass',2000,3,.5);SND.nz(g,t+r*.45,.05,'bandpass',1200,4,.6);SND.nz(g,t+r*.85,.06,'highpass',2600,3,.6)}catch(e){}},
+ // v7: own steps quieter (.35 -> .15); others audible only within a radius (crouch 5m, walk 13m, run 22m) with steep falloff, muffled through walls
+ step(pos,loud){try{let v=loud*(pos?1:.15),f=380+loud*300;if(pos&&G){const L=camera.position,d=Math.hypot(pos[0]-L.x,pos[1]-L.y,pos[2]-L.z),R=loud<.2?5:loud<.8?13:22;if(d>R)return;v*=Math.pow(1-d/R,1.6)*(1+d*.11);
+   if(!los([L.x,L.y,L.z],[pos[0],pos[1]+.3,pos[2]])){v*=.4;f=180}}const g=SND.out(pos,v);if(!g)return;const t=AC.currentTime;SND.nz(g,t,.07,'lowpass',f,1,.7)}catch(e){}},
+ hit(hs,kill){try{const g=SND.out(null,.6);if(!g)return;const t=AC.currentTime;SND.tn(g,t,hs?1900:1300,hs?1700:1100,.07,'square',.25);if(kill)SND.tn(g,t+.07,900,600,.18,'triangle',.4)}catch(e){}},
+ hurt(){try{const g=SND.out(null,.5);if(!g)return;SND.nz(g,AC.currentTime,.12,'lowpass',500,1,.8)}catch(e){}},
+ boom(pos){try{const g=SND.out(pos,1.4);if(!g)return;const t=AC.currentTime;SND.nz(g,t,.9,'lowpass',500,.7,1);SND.tn(g,t,90,30,.7,'sine',1)}catch(e){}},
+ ui(f){try{const g=SND.out(null,.35);if(!g)return;SND.tn(g,AC.currentTime,f||700,(f||700)*1.2,.06,'square',.18)}catch(e){}},
+ clink(pos){try{const g=SND.out(pos,.6);if(!g)return;SND.tn(g,AC.currentTime,2400,1800,.12,'triangle',.3)}catch(e){}},
+ sting(k){try{const g=SND.out(null,.45);if(!g)return;const t=AC.currentTime;const seq={go:[392,523,659],win:[523,659,784,1046],lose:[440,370,311,247],vote:[660,880]}[k]||[500];seq.forEach((f,i)=>SND.tn(g,t+i*.11,f,f,.22,'triangle',.5))}catch(e){}},
+ swing(pos){try{const g=SND.out(pos,.5);if(!g)return;SND.nz(g,AC.currentTime,.18,'bandpass',900,1.5,.5)}catch(e){}},
+ stab(pos){try{const g=SND.out(pos,.7);if(!g)return;const t=AC.currentTime;SND.nz(g,t,.1,'lowpass',700,1,.9);SND.tn(g,t,180,70,.12,'sine',.5)}catch(e){}},
+ charge(c){try{if(c<=0||Math.random()>.25)return;const g=SND.out(null,.15);if(!g)return;SND.tn(g,AC.currentTime,300+c*900,320+c*900,.06,'sawtooth',.2)}catch(e){}},
+ pad(pos){try{const g=SND.out(pos,.6);if(!g)return;SND.tn(g,AC.currentTime,200,900,.25,'sine',.5)}catch(e){}},
+ casing(pos){try{const g=SND.out(pos,.108);if(!g)return;const t=AC.currentTime+.25;SND.tn(g,t,3800,3500,.05,'triangle',.25);SND.tn(g,t+.09,4100,3900,.04,'triangle',.15)}catch(e){}},
+ heal(pos){try{const g=SND.out(pos,.5);if(!g)return;const t=AC.currentTime;[523,659,784].forEach((f,i)=>SND.tn(g,t+i*.06,f,f,.3,'sine',.3))}catch(e){}},
+ deploy(pos){try{const g=SND.out(pos,.5);if(!g)return;const t=AC.currentTime;SND.nz(g,t,.06,'highpass',2000,2,.5);SND.tn(g,t+.05,600,900,.08,'square',.15)}catch(e){}},
+ cloak(pos){try{const g=SND.out(pos,.5);if(!g)return;SND.tn(g,AC.currentTime,1200,150,.5,'sine',.35)}catch(e){}},
+ rope(pos){try{const g=SND.out(pos,.5);if(!g)return;const t=AC.currentTime;SND.nz(g,t,.35,'bandpass',1500,3,.5)}catch(e){}},
+ emp(pos){try{const g=SND.out(pos,1.1);if(!g)return;const t=AC.currentTime;SND.tn(g,t,1800,60,.6,'sawtooth',.5);SND.nz(g,t,.5,'bandpass',3000,1,.5)}catch(e){}},
+ heart(){try{const g=SND.out(null,.55);if(!g)return;const t=AC.currentTime;SND.tn(g,t,70,45,.12,'sine',.9);SND.tn(g,t+.18,62,40,.14,'sine',.7)}catch(e){}},
+ beep(pos){try{const g=SND.out(pos,.5);if(!g)return;SND.tn(g,AC.currentTime,2200,2200,.08,'square',.3)}catch(e){}},
+};
+function sfx(w,dist,kind){if(kind==='boom')SND.boom(null);else if(w)SND.shot(w,null)}

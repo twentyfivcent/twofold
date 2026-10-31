@@ -1,0 +1,11 @@
+// ===== V8.1: Esc opens/closes the in-game menu without leaving fullscreen (Keyboard Lock API, feature-detected) + rebindable 'Open menu' key fallback.
+const KL={active:false,sup:!!(navigator.keyboard&&navigator.keyboard.lock)};
+function kbLockFS(){if(!KL.sup)return;try{if(fsEl()){const r=navigator.keyboard.lock(['Escape']);KL.active=true;if(r&&r.then)r.then(()=>{KL.active=true},()=>{KL.active=false})}else{KL.active=false;navigator.keyboard.unlock&&navigator.keyboard.unlock()}}catch(e){KL.active=false}window.__kl={sup:KL.sup,active:KL.active}}
+document.addEventListener('fullscreenchange',kbLockFS);document.addEventListener('webkitfullscreenchange',kbLockFS);
+KB_ACTIONS.push(['menu','Open / close menu (Esc also works in fullscreen)','KeyP']);KBM=kbMap();
+function gameMenuToggle(){const pz=$('#pause');if(!G||!pz)return;
+ if(typeof locked!=='undefined'&&locked){try{document.exitPointerLock()}catch(e){}if(pz.classList.contains('hide'))pz.classList.remove('hide');for(const k in K)K[k]=false;window.__menuT='open';return}
+ if(!pz.classList.contains('hide')){window.__menuT='resume';lockPointer();return}
+ pz.classList.remove('hide');for(const k in K)K[k]=false;window.__menuT='open'}
+addEventListener('keydown',e=>{if(!G||KBCAP||e.repeat)return;const t=e.target;if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable))return;if(typeof CHAT!=='undefined'&&CHAT.open)return;
+ const isEsc=e.code==='Escape'||e.key==='Escape';if((isEsc&&KL.active&&fsEl())||(KBM.menu&&e.code===KBM.menu)){e.preventDefault();e.stopPropagation();gameMenuToggle()}},true);

@@ -1,0 +1,89 @@
+// ===================== WEAPON LOGIC =====================
+function equip(p,lo){p.inv=[{w:lo[0],mag:W[lo[0]].mag,res:W[lo[0]].res},{w:lo[1],mag:W[lo[1]].mag,res:W[lo[1]].res}];p.cur=0;p.lth=lo[2];p.lthN=UT[lo[2]].c;p.tcu=lo[3]&&UT[lo[3]]?lo[3]:null;p.tacN=p.tcu?UT[p.tcu].c:0;p.uAct='l';p.util=lo[2];p.utilN=p.lthN;p._lH=p._tH=false;p.reloadT=0;p.fireCd=0;p.burst=0;p.cook=-1;p.swapT=0;p.shotIdx=0;p.rcAcc=0;p.rcT=0;p.chg=0;p.grap=null;p.meleeCd=0;p.meleeT=0;p.cloakT=0;p.empT=0}
+const NADE_FUSE={frag:3.2,sticky:2.5,emp:1.6,heal:1.2,smoke:1.6,flash:1.6};
+// v8 drop 2: two utility slots. p.util/p.utilN always mirror the ACTIVE slot (lethal 'l' or tactical 't') so the throw/cook code is unchanged.
+function utilHas(p,t){return p.lth===t||p.tcu===t||p.util===t}
+function utilCount(p,t){return p.lth===t?p.lthN:p.tcu===t?p.tacN:p.utilN}
+function utilAdd(p,t,d){const cl=(n,c)=>Math.max(0,Math.min(c,n));if(p.lth===t){p.lthN=cl(p.lthN+d,99);if(p.uAct!=='t')p.utilN=p.lthN}else if(p.tcu===t){p.tacN=cl(p.tacN+d,99);if(p.uAct==='t')p.utilN=p.tacN}else p.utilN=Math.max(0,p.utilN+d)}
+function utilSlot(p,inp,dt){if(!p.lth)return;const act=p.uAct==='t'?p.tcu:p.lth;
+ if(p.util&&UT[p.util]&&p.util!==act){if(LETHALS.includes(p.util)){p.lth=p.util;p.uAct='l'}else{p.tcu=p.util;p.uAct='t'}}/*legacy: something set p.util directly - adopt it into the matching slot*/
+ if(p.uAct==='t')p.tacN=p.utilN;else p.lthN=p.utilN;
+ if(p.bot||(inp.lethal===undefined&&inp.tactical===undefined)){if(p.bot&&p.cook<0&&!inp.util&&Math.random()<dt*.6){const want=p.uAct==='t'?'l':'t';if((want==='t'?p.tacN:p.lthN)>0&&(want==='l'||p.tcu))p.uAct=want}else if(p.cook<0&&(p.uAct==='t'?p.tacN:p.lthN)<=0)p.uAct=p.uAct==='t'?'l':(p.tcu?'t':'l')}
+ else{const L=!!inp.lethal,T=!!inp.tactical;if(p.cook<0){if(L&&!p._lH)p.uAct='l';else if(T&&!p._tH&&p.tcu)p.uAct='t'}
+  p.utilHeld=p.uAct==='t'?p._tH:p._lH;inp.util=p.uAct==='t'?T:L;p._lH=L;p._tH=T}
+ p.util=p.uAct==='t'?p.tcu:p.lth;p.utilN=p.uAct==='t'?p.tacN:p.lthN}
+function weaponTick(p,inp,dt,canFire){
+ if(p.off||!p.alive)return;
+ p.fireCd-=dt;p.swapT-=dt;p.meleeCd-=dt;p.meleeT-=dt;
+ if(p.inspT>0){p.inspT-=dt;if(inp.fire||inp.ads||inp.melee||inp.util||inp.reload||(inp.sw!==undefined&&inp.sw!==p.cur)||p.reloadT>0||p.swapT>0||p.mant)p.inspT=0}
+ const slot=p.inv[p.cur],w=W[slot.w];
+ if(w.spinUp){const hold=!!inp.fire&&canFire&&p.meleeT<=0&&p.reloadT<=0&&p.swapT<=0&&slot.mag>0;p.spin=hold?Math.min(1,(p.spin||0)+dt/w.spinUp):Math.max(0,(p.spin||0)-dt/w.spinDown);if(p.id===ME&&hold&&p.spin<1&&typeof SND!=='undefined')SND.charge(p.spin*.5)}else p.spin=0;
+ if(inp.sw!==undefined&&inp.sw!==p.cur&&p.cook<0){p.cur=inp.sw;p.reloadT=0;p.burst=0;p.swapT=.45;p.ads=false;p.chg=0;return}
+ if(p.reloadT>0){p.reloadT-=dt;if(p.reloadT<=0){const n=Math.min(w.mag-slot.mag,slot.res);slot.mag+=n;slot.res-=n}}
+ p.ads=!!inp.ads&&!(W[p.inv[p.cur].w]||{}).noAds&&p.reloadT<=0&&p.swapT<=0&&p.meleeT<=0;
+ if(inp.reload&&p.reloadT<=0&&slot.mag<w.mag&&slot.res>0){p.reloadT=w.rel;p.burst=0;p.chg=0;if(p.id===ME)SND.reload(w)}
+ p.rcT=(p.rcT||0)+dt;if(p.rcT>.12&&p.rcAcc>0){const r=Math.min(p.rcAcc,dt*Math.max(.15,p.rcAcc*7));p.pitch-=r;p.rcAcc-=r}
+ // melee (F): quick strike, 1 hit from behind, 2 from the front
+ if(canFire&&inp.melee&&!p.meleeH&&p.meleeCd<=0&&p.swapT<=0&&p.cook<0){p.meleeCd=.8;p.meleeT=.38;p.reloadT=0;p.burst=0;p.chg=0;sendOrDo({t:'melee'},p.id);if(p.id===ME){VK.mel=.38;SND.swing()}}
+ p.meleeH=!!inp.melee;
+ utilSlot(p,inp,dt);
+ if(canFire&&p.util&&p.utilN>0&&!(p.empT>0)){const u=UT[p.util];
+  if(u.knifeCook){/*v8: cookable Talon Knife. Hold G: short windup (KNIFE_WIND), power ramps to a cap at KNIFE_CAP; release throws.*/
+   if(p.cook<0&&inp.util&&!p.utilHeld){p.cook=0;p._kh=p.bot?.25+Math.random()*.4:0}
+   if(p.cook>=0){p.cook+=dt;const held=p.bot?p.cook<p._kh:!!inp.util;if(!held&&p.cook>=KNIFE_WIND){throwKnifeCooked(p,p.cook);p.cook=-1;p.utilN--;if(p.id===ME)SND.ui(520)}}}
+  else if(u.inst||u.throwNow){if((inp.util&&!p.utilHeld)||p.cook>=0){let used=true;
+    if(p.util==='grapple'){const o=eye(p),d=dirYP(p.yaw,p.pitch),t=rayWorld(o,d,30);if(t<30&&t>2){const pt=[o[0]+d[0]*t,o[1]+d[1]*t,o[2]+d[2]*t];p.grap={pt,t:1.5};sendOrDo({t:'util',type:'grapple',pt},p.id)}else{used=false;if(p.id===ME)SND.ui(220)}}
+    else if(u.inst)sendOrDo({t:'util',type:p.util},p.id);else throwUtil(p,3);
+    if(used){p.utilN--;if(p.id===ME)SND.ui(u.inst?660:520)}p.cook=-1}}
+  else{if(inp.util&&p.cook<0)p.cook=0;
+  if(p.cook>=0){p.cook+=dt;const fuse=NADE_FUSE[p.util]||1.6;
+   if(!inp.util||p.cook>=fuse){throwUtil(p,p.util==='sticky'?2.5:Math.max(.05,fuse-p.cook));p.cook=-1;p.utilN--}}}
+ }
+ p.utilHeld=!!inp.util;if(p.uAct==='t')p.tacN=p.utilN;else p.lthN=p.utilN;
+ if(!canFire||p.meleeT>0){p.trig=!!inp.fire;p.burst=0;p.chg=0;return}
+ const want=!!inp.fire, edge=want&&!p.trig, rel=!want&&p.trig;p.trig=want;
+ if(p.reloadT>0||p.swapT>0)return;
+ if(slot.mag<=0){p.chg=0;if(want&&slot.res>0){p.reloadT=w.rel;if(p.id===ME)SND.reload(w)}return}
+ let shoot=false,ch=1;
+ if(w.mode==='burst'){if(p.burst>0&&p.fireCd<=0)shoot=true;else if(edge&&p.fireCd<=0&&p.burst<=0){p.burst=w.burst;shoot=true}}
+ else if(w.mode==='auto')shoot=want&&p.fireCd<=0&&(!w.spinUp||p.spin>=.25);
+ else if(w.mode==='charge'){if(want&&p.fireCd<=0){p.chg=Math.min(1,p.chg+dt/w.ct);if(p.id===ME)SND.charge(p.chg)}if(rel&&p.chg>.12){shoot=true;ch=p.chg}if(!want)p.chg=0}
+ else shoot=edge&&p.fireCd<=0;
+ p.bT=(p.bT||0)+dt;if(p.bT>.12)p.bloom=Math.max(0,(p.bloom||0)-dt*(w.bcap||1)*2.5);
+ if(!shoot){if(!want)p.shotIdx=Math.max(0,p.shotIdx-dt*8);return}
+ slot.mag--;p.chg=0;p.alt=1-p.alt;
+ if(w.mode==='burst'){p.burst--;p.fireCd=p.burst>0?60/w.brpm:60/w.rpm;if(slot.mag<=0)p.burst=0}else p.fireCd=60/(w.rpm*(w.spinUp?.3+.7*p.spin:1));
+ fireShot(p,w,ch);
+ if(slot.mag<=0&&slot.res>0){p.reloadT=w.rel+.15;if(p.id===ME)SND.reload(w)}
+}
+function fireShot(p,w,ch){
+ if(p.id===ME&&!p.bot&&typeof MSTAT_shot==='function')MSTAT_shot(p.inv[p.cur].w);
+ ch=ch===undefined?1:ch;
+ const o=eye(p);
+ const ads=p.adsAmt>.7;
+ let sp=(ads?w.ads:w.sp)*(p.moving?1.5:1)*(p.ground?1:2.2)*(p.crouch?.75:1);
+ sp+=(p.bloom||0)*bloomMult(p);p.bloom=Math.min(w.bcap||0,(p.bloom||0)+(w.bstep||0));p.bT=0;
+ if((w.mode==='bolt'||w.hs1||w.hipPen)&&!ads)sp=Math.max(sp,8);
+ const dirs=[];const n=w.pellets||1;
+ if(window.__nospread)sp=0;
+ const swy=p.id===ME&&ads?SWAY[0]:0,swp=p.id===ME&&ads?SWAY[1]:0;
+ for(let i=0;i<n;i++){const s=sp*DEG*Math.sqrt(Math.random())*(n>1?1:.6),a=Math.random()*Math.PI*2;dirs.push(dirYP(p.yaw+swy+Math.cos(a)*s,p.pitch+swp+Math.sin(a)*s))}
+ const m=(ads?.6:1)*(p.crouch?.75:1);const pt=w.pat[Math.min(39,Math.floor(p.shotIdx))];p.shotIdx++;
+ const dv=w.rv*.42*DEG*m*pt[0]*(.92+Math.random()*.16)*(w.mode==='charge'?.5+ch*.5:1);p.pitch=Math.min(1.5,p.pitch+dv);p.rcAcc=(p.rcAcc||0)+dv;p.rcT=0;
+ p.yaw+=w.rh*.5*DEG*m*(pt[1]+(Math.random()-.5)*.25);
+ if(p.id===ME){VK.kick=Math.min(1,VK.kick+.25+w.rv*.06);VK.flash=.05;VK.alt=p.alt;SND.shot(w,null);ejectCasing(w)}
+ if(w.mode==='launch'){const d=dirYP(p.yaw,p.pitch);sendOrDo({t:'nade',type:'rocket',pos:o,vel:[d[0]*28,d[1]*28+2,d[2]*28],fuse:5},p.id);return}
+ if(w.mode==='xbow'){const d=dirs[0];sendOrDo({t:'nade',type:'bolt',w:w.id,pos:[o[0]+d[0]*.5,o[1]+d[1]*.5,o[2]+d[2]*.5],vel:[d[0]*XBOW_V,d[1]*XBOW_V,d[2]*XBOW_V],fuse:4},p.id);return}
+ sendOrDo({t:'shot',o,dirs,w:w.id,ch},p.id);
+ if(p.id===ME){for(const d of dirs.slice(0,3)){const t=rayWorld(o,d,150);const e=[o[0]+d[0]*t,o[1]+d[1]*t,o[2]+d[2]*t];addTracer(o,e,true,p.id);if(t<150)addImpact(e,d)}}
+}
+const KNIFE_WIND=.12,KNIFE_CAP=.7,KNIFE_VMIN=22;
+function knifePower(hold){return Math.max(0,Math.min(1,(hold-KNIFE_WIND)/(KNIFE_CAP-KNIFE_WIND)))}
+// speed 22 -> 44 m/s; a weak throw is lobbed (loft up to +0.16 rad) so it still arcs to a nearby target, a full one flies flat along the crosshair
+function knifeThrowVel(p,hold){const k=knifePower(hold),v=KNIFE_VMIN+(KNIFE_V-KNIFE_VMIN)*k,d=dirYP(p.yaw,p.pitch+(1-k)*.16);return {k,v,vel:[d[0]*v,d[1]*v,d[2]*v],d}}
+function throwKnifeCooked(p,hold){const t=knifeThrowVel(p,hold),o=eye(p),d=dirYP(p.yaw,p.pitch);p._lastKnife={hold:+hold.toFixed(3),k:+t.k.toFixed(3),v:+t.v.toFixed(2)};
+ sendOrDo({t:'nade',type:'knife',pos:[o[0]+d[0]*.45,o[1]+d[1]*.45,o[2]+d[2]*.45],vel:t.vel,fuse:3},p.id)}
+function throwUtil(p,fuse){const kn=p.util==='knife';const d=dirYP(p.yaw,p.pitch+(kn?0:.12));const o=eye(p);const v=kn?KNIFE_V:p.crouch?11:15;
+ // knives leave exactly along the crosshair ray (no upward kick), heavier and faster
+ sendOrDo({t:'nade',type:p.util,pos:[o[0]+d[0]*.45,o[1]+d[1]*.45,o[2]+d[2]*.45],vel:kn?[d[0]*v,d[1]*v,d[2]*v]:[d[0]*v+p.vel[0]*.5,d[1]*v+1.5,d[2]*v+p.vel[2]*.5],fuse},p.id)}
+function sendOrDo(m,pid){if(HOST)hostAction(pid,m);else if(hostConn)netSend(hostConn,m)}

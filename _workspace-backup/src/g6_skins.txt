@@ -1,0 +1,91 @@
+// ===================== v6 SKINS + CRATES (procedural, matches supabase-setup.sql) =====================
+const RAR={common:{n:'Common',c:'#b8c4d0',w:500},uncommon:{n:'Uncommon',c:'#5fd16a',w:250},rare:{n:'Rare',c:'#4aa3ff',w:120},epic:{n:'Epic',c:'#c46bff',w:45},legendary:{n:'Legendary',c:'#ffb02e',w:12}};
+const RAR_ORDER=['common','uncommon','rare','epic','legendary'];
+// v7.1: crate lists show Common -> Legendary, alphabetical within a rarity
+function rarSort(L){return L.slice().sort((a,b)=>RAR_ORDER.indexOf(a.rar)-RAR_ORDER.indexOf(b.rar)||String(a.n).localeCompare(String(b.n)))}
+const CRATES=[{id:'ember',n:'Ember Crate',theme:'Volcanic forge',price:300,col:'#ff6a2a'},{id:'tide',n:'Tidewater Crate',theme:'Deep ocean',price:350,col:'#2ac0ff'},{id:'circuit',n:'Circuit Crate',theme:'Neon tech',price:400,col:'#7dff5a'}];
+// pat = which procedural generator, anim = live material animation, att = extra geometry
+const SKINS=[
+ ['em_ash','ember','wasp','Ashfall Camo','common','camo',{c:['#3a3532','#5d5650','#8a8078','#211e1c']}],
+ ['em_basalt','ember','sparrow','Basalt Weave','common','hex',{c:['#262422','#45403b'],line:'#121110'}],
+ ['em_cinderwood','ember','drake','Cinderwood Inlay','uncommon','wood',{c:['#3b1f12','#6b3a1e'],inlay:'#d0802a'}],
+ ['em_forge','ember','strix','Forge Damascus','uncommon','damascus',{c:['#5a5652','#a8a29a'],tint:'#ffb070'}],
+ ['em_magma','ember','kestrel','Magma Veins','rare','veins',{c:'#1a1210',glow:'#ff4a10',anim:'pulse',att:'strip'}],
+ ['em_obsidian','ember','magnate','Obsidian Gild','epic','gild',{c:'#0b0a0d',gold:'#e8b04a',anim:'shine',att:'charm',metal:.9,rough:.18}],
+ ['em_caldera','ember','longreach','Caldera Heart','legendary','lava',{c:'#140806',glow:'#ff7a1a',anim:'flow',att:'fins'}],
+ ['td_reef','tide','ferret','Reef Camo','common','camo',{c:['#16404a','#2b6b6b','#d08a6a','#0e2a33']}],
+ ['td_kelp','tide','pip','Kelpwood Inlay','common','wood',{c:['#1c2a1a','#34502c'],inlay:'#8fd0b0'}],
+ ['td_brine','tide','brute','Brine Carbon','uncommon','carbon',{c:['#0f1c24','#1f3a48'],salt:'#cfe8ee'}],
+ ['td_pearl','tide','warden','Pearl Filigree','uncommon','filigree',{c:'#e6e2da',line:'#7a9aa8',metal:.3,rough:.3}],
+ ['td_caustic','tide','hornet','Caustic Flow','rare','caustic',{c:'#063a52',glow:'#7ff0ff',anim:'flow',att:'strip'}],
+ ['td_abyss','tide','needle','Abyssal Glow','epic','abyss',{c:'#02060e',glow:'#2affd0',anim:'pulse',att:'charm'}],
+ ['td_leviathan','tide','typhoon','Leviathan Shimmer','legendary','scales',{c:'#0a2a40',glow:'#58f0ff',anim:'hue',att:'plates'}],
+ ['ci_grid','circuit','gust','Gridline Camo','common','grid',{c:['#2a2f2a','#3c443c'],line:'#6a7a5a'}],
+ ['ci_carbon','circuit','dart','Carbon Mesh','common','carbon',{c:['#121314','#2a2c2e']}],
+ ['ci_trace','circuit','lathe','Tracewire','uncommon','pcb',{c:'#0f3a1c',line:'#d8b040'}],
+ ['ci_steel','circuit','maul','Coldsteel Damascus','uncommon','damascus',{c:['#4a5560','#b8c8d4'],tint:'#a0d0ff'}],
+ ['ci_pulse','circuit','corvid','Pulse Traces','rare','pulse',{c:'#08100c',glow:'#5aff7a',anim:'flow',att:'strip'}],
+ ['ci_holo','circuit','wren','Holofoil','epic','holo',{c:'#9aa0b0',anim:'hue',att:'charm',metal:1,rough:.12}],
+ ['ci_overclock','circuit','pike','Overclock Prism','legendary','prism',{c:'#101018',glow:'#ff3af0',anim:'hue',att:'crystal'}],
+].map(([id,crate,gun,n,rar,pat,o])=>Object.assign({id,crate,gun,n,rar,pat,w:RAR[rar].w},o));
+const SKIN={};SKINS.forEach(s=>SKIN[s.id]=s);
+function crateOdds(cid){const L=SKINS.filter(s=>s.crate===cid),T=L.reduce((a,s)=>a+s.w,0);const r={};for(const s of L)r[s.rar]=(r[s.rar]||0)+s.w/T*100;return r}
+// ---------- texture generators (each pattern is drawn differently, not a palette swap) ----------
+function srng(seed){let x=0;for(const ch of seed)x=(x*31+ch.charCodeAt(0))|0;return()=>{x^=x<<13;x^=x>>>17;x^=x<<5;return((x>>>0)%100000)/100000}}
+const SKTEX={};
+function skinCanvas(s,emis){const k=s.id+(emis?'|e':'');if(SKTEX[k])return SKTEX[k];const N=256,cv=document.createElement('canvas');cv.width=cv.height=N;const x=cv.getContext('2d');const R=srng(s.id+(emis?'e':''));
+ const fill=c=>{x.fillStyle=c;x.fillRect(0,0,N,N)};const C=Array.isArray(s.c)?s.c:[s.c];
+ const blob=(cx,cy,r,c)=>{x.fillStyle=c;x.beginPath();for(let i=0;i<=10;i++){const a=i/10*Math.PI*2,rr=r*(.6+R()*.6);x.lineTo(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr)}x.fill()};
+ const wrapDo=(f)=>{for(const dx of [-N,0,N])for(const dy of [-N,0,N]){x.save();x.translate(dx,dy);f();x.restore()}};
+ if(emis)fill('#000');
+ switch(s.pat){
+ case 'camo':{fill(C[0]);for(let l=1;l<C.length;l++)for(let i=0;i<14-l*3;i++){const cx=R()*N,cy=R()*N,r=14+R()*30;wrapDo(()=>blob(cx,cy,r,C[l]))}break}
+ case 'hex':{fill(C[0]);const r=16,h=r*Math.sqrt(3);x.strokeStyle=s.line;x.lineWidth=3;for(let j=-1;j<N/h+2;j++)for(let i=-1;i<N/(r*1.5)+2;i++){const cx=i*r*1.5,cy=j*h+(i%2?h/2:0);x.fillStyle=R()<.5?C[0]:C[1];x.beginPath();for(let k=0;k<6;k++){const a=k/6*Math.PI*2;x.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r)}x.closePath();x.fill();x.stroke()}break}
+ case 'wood':{fill(C[0]);for(let y=0;y<N;y+=2){x.strokeStyle=C[R()<.5?0:1];x.globalAlpha=.6;x.beginPath();for(let xx=0;xx<=N;xx+=8)x.lineTo(xx,y+Math.sin(xx*.05+y*.3)*3);x.stroke()}x.globalAlpha=1;x.strokeStyle=s.inlay;x.lineWidth=3;for(const yy of [64,192]){x.beginPath();x.moveTo(0,yy);x.lineTo(N,yy);x.stroke()}for(let i=0;i<4;i++){const cx=32+i*64;x.beginPath();x.moveTo(cx,52);x.lineTo(cx+12,64);x.lineTo(cx,76);x.lineTo(cx-12,64);x.closePath();x.fillStyle=s.inlay;x.fill()}break}
+ case 'damascus':{fill(C[0]);for(let i=0;i<46;i++){x.strokeStyle=i%2?C[1]:C[0];x.lineWidth=2+R()*3;x.beginPath();const ph=R()*6;for(let xx=0;xx<=N;xx+=4)x.lineTo(xx,i*6+Math.sin(xx*.045+ph)*10+Math.sin(xx*.13)*4);x.stroke()}x.globalAlpha=.18;fill(s.tint);x.globalAlpha=1;break}
+ case 'veins':{fill(emis?'#000':s.c);x.strokeStyle=s.glow;for(let i=0;i<9;i++){let px=R()*N,py=R()*N;x.lineWidth=emis?3:2;x.beginPath();x.moveTo(px,py);for(let k=0;k<14;k++){px+=(R()-.5)*40;py+=(R()-.3)*30;x.lineTo(px,py)}x.stroke()}if(!emis){x.globalAlpha=.4;for(let i=0;i<300;i++){x.fillStyle='#3a2a20';x.fillRect(R()*N,R()*N,2,2)}x.globalAlpha=1}break}
+ case 'gild':{fill(emis?'#000':s.c);if(!emis){for(let i=0;i<500;i++){x.fillStyle=`rgba(255,255,255,${R()*.05})`;x.fillRect(R()*N,R()*N,3,3)}}x.strokeStyle=s.gold;x.lineWidth=emis?1.5:2.5;for(let i=0;i<6;i++){const cx=R()*N,cy=R()*N;x.beginPath();for(let a=0;a<12;a+=.15){const r=a*3.5;x.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r)}x.stroke()}x.beginPath();x.moveTo(0,8);x.lineTo(N,8);x.moveTo(0,N-8);x.lineTo(N,N-8);x.stroke();break}
+ case 'lava':{fill(emis?'#000':s.c);for(let i=0;i<40;i++){const cx=R()*N,cy=R()*N,r=6+R()*26;const g=x.createRadialGradient(cx,cy,0,cx,cy,r);g.addColorStop(0,emis?'#ffd080':'#ff9a30');g.addColorStop(.5,s.glow);g.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=g;wrapDo(()=>{x.beginPath();x.arc(cx,cy,r,0,7);x.fill()})}if(!emis){x.strokeStyle='#050202';x.lineWidth=4;for(let i=0;i<10;i++){x.beginPath();let px=R()*N,py=R()*N;x.moveTo(px,py);for(let k=0;k<6;k++){px+=(R()-.5)*60;py+=(R()-.5)*60;x.lineTo(px,py)}x.stroke()}}break}
+ case 'carbon':{for(let j=0;j<N;j+=8)for(let i=0;i<N;i+=8){const g=x.createLinearGradient(i,j,i+8,j+8);const o=((i+j)/8)%2;g.addColorStop(0,C[o]);g.addColorStop(1,C[1-o]);x.fillStyle=g;x.fillRect(i,j,8,8)}if(s.salt){for(let i=0;i<60;i++){x.fillStyle=s.salt;x.globalAlpha=.25+R()*.4;blob(R()*N,R()*N,2+R()*5,s.salt)}x.globalAlpha=1}break}
+ case 'filigree':{fill(s.c);x.strokeStyle=s.line;x.lineWidth=1.5;for(let j=0;j<4;j++)for(let i=0;i<4;i++){const cx=i*64+32,cy=j*64+32;for(let k=0;k<4;k++){x.beginPath();const a0=k*Math.PI/2;for(let t=0;t<1;t+=.05){const a=a0+t*2.6,r=6+t*22;x.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r)}x.stroke()}x.beginPath();x.arc(cx,cy,4,0,7);x.stroke()}for(let i=0;i<200;i++){x.fillStyle=`rgba(255,240,255,${R()*.3})`;x.fillRect(R()*N,R()*N,2,2)}break}
+ case 'caustic':{fill(emis?'#000':s.c);x.strokeStyle=s.glow;for(let i=0;i<70;i++){const cx=R()*N,cy=R()*N,r=10+R()*18;x.lineWidth=emis?2:1.2;x.globalAlpha=.4+R()*.6;x.beginPath();for(let k=0;k<=7;k++){const a=k/7*Math.PI*2;x.lineTo(cx+Math.cos(a)*r*(.7+R()*.4),cy+Math.sin(a)*r*(.7+R()*.4))}x.stroke()}x.globalAlpha=1;break}
+ case 'abyss':{const g=x.createLinearGradient(0,0,0,N);g.addColorStop(0,emis?'#000':'#04142a');g.addColorStop(1,emis?'#000':s.c);x.fillStyle=g;x.fillRect(0,0,N,N);for(let i=0;i<70;i++){const cx=R()*N,cy=R()*N,r=1+R()*3;x.fillStyle=s.glow;x.globalAlpha=.5+R()*.5;x.beginPath();x.arc(cx,cy,r,0,7);x.fill()}x.globalAlpha=.7;x.strokeStyle=s.glow;x.lineWidth=1;for(let i=0;i<5;i++){let px=R()*N;x.beginPath();x.moveTo(px,N);for(let y=N;y>0;y-=10){px+=Math.sin(y*.08+i)*4;x.lineTo(px,y)}x.stroke()}x.globalAlpha=1;break}
+ case 'scales':{fill(emis?'#000':s.c);const r=14;for(let j=-1;j<N/(r*.9)+1;j++)for(let i=-1;i<N/(r*2)+1;i++){const cx=i*r*2+(j%2?r:0),cy=j*r*.9;if(emis){x.strokeStyle=s.glow;x.lineWidth=1.5;x.beginPath();x.arc(cx,cy,r,0,Math.PI);x.stroke()}else{const g=x.createRadialGradient(cx,cy+r*.5,1,cx,cy,r);g.addColorStop(0,'#3aa0c0');g.addColorStop(1,s.c);x.fillStyle=g;x.beginPath();x.arc(cx,cy,r,0,Math.PI);x.fill();x.strokeStyle='#04121c';x.lineWidth=1.5;x.stroke()}}break}
+ case 'grid':{fill(C[0]);for(let i=0;i<8;i++){x.fillStyle=C[1];x.fillRect(Math.floor(R()*8)*32,Math.floor(R()*8)*32,32*(1+Math.floor(R()*3)),32*(1+Math.floor(R()*2)))}x.strokeStyle=s.line;x.lineWidth=1;for(let i=0;i<=N;i+=16){x.beginPath();x.moveTo(i,0);x.lineTo(i,N);x.moveTo(0,i);x.lineTo(N,i);x.stroke()}break}
+ case 'pcb':{fill(s.c);x.strokeStyle=s.line;x.lineWidth=2.5;for(let i=0;i<26;i++){let px=Math.floor(R()*16)*16,py=Math.floor(R()*16)*16;x.beginPath();x.moveTo(px,py);for(let k=0;k<4;k++){if(R()<.5)px+=(R()<.5?-1:1)*16*(1+Math.floor(R()*3));else py+=(R()<.5?-1:1)*16*(1+Math.floor(R()*3));x.lineTo(px,py)}x.stroke();x.fillStyle=s.line;x.beginPath();x.arc(px,py,4,0,7);x.fill()}for(let i=0;i<6;i++){x.fillStyle='#111';x.fillRect(R()*N,R()*N,26,14)}break}
+ case 'pulse':{fill(emis?'#000':s.c);x.strokeStyle=s.glow;x.lineWidth=emis?3:2;for(let j=0;j<8;j++){const y=j*32+16;x.beginPath();x.moveTo(0,y);for(let xx=0;xx<N;xx+=32){const sp=R()<.4;x.lineTo(xx+10,y);if(sp){x.lineTo(xx+14,y-12);x.lineTo(xx+18,y+10);x.lineTo(xx+22,y)}x.lineTo(xx+32,y)}x.stroke()}break}
+ case 'holo':{for(let j=0;j<N;j+=4)for(let i=0;i<N;i+=4){const h=(i*1.3+j*.7+Math.sin(i*.05)*30)%360;x.fillStyle=`hsl(${h},70%,${emis?25:60}%)`;x.fillRect(i,j,4,4)}x.globalAlpha=.3;for(let i=0;i<40;i++){x.fillStyle='#fff';const cx=R()*N,cy=R()*N;x.fillRect(cx,cy,1,8);x.fillRect(cx-3.5,cy+3.5,8,1)}x.globalAlpha=1;break}
+ case 'prism':{fill(emis?'#000':s.c);for(let i=0;i<28;i++){const cx=R()*N,cy=R()*N,r=8+R()*26,h=R()*360;x.fillStyle=`hsla(${h},90%,${emis?55:45}%,${emis?.9:.7})`;x.beginPath();x.moveTo(cx,cy-r);x.lineTo(cx+r*.8,cy+r*.5);x.lineTo(cx-r*.8,cy+r*.5);x.closePath();x.fill()}if(!emis){x.strokeStyle='#000';x.lineWidth=2;for(let i=0;i<N;i+=32){x.beginPath();x.moveTo(i,0);x.lineTo(i+N/2,N);x.stroke()}}break}
+ }
+ const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(6,6);if(THREE.sRGBEncoding&&!emis)t.encoding=THREE.sRGBEncoding;SKTEX[k]=t;return t}
+const SKMAT={},SKANIM=[];
+function skinMat(s,role){const k=s.id+'|'+role;if(SKMAT[k])return SKMAT[k];const glow=!!s.glow||s.pat==='holo'||s.pat==='gild';
+ const m=new THREE.MeshStandardMaterial({map:skinCanvas(s),roughness:s.rough!==undefined?s.rough:.55,metalness:s.metal!==undefined?s.metal:.35});
+ if(role==='acc'){m.color.setScalar(.72)}
+ if(glow){m.emissiveMap=skinCanvas(s,true);m.emissive=new THREE.Color(s.glow||s.gold||'#ffffff');m.emissiveIntensity=s.pat==='holo'?.35:1.1}
+ m.userData.skin=s;if(s.anim){SKANIM.push(m)}SKMAT[k]=m;return m}
+// rarity attachments: unique geometry beyond textures
+function skinAttach(g,s,L){const glowM=new THREE.MeshBasicMaterial({color:new THREE.Color(s.glow||s.gold||'#e0e0ff')});if(s.anim)SKANIM.push(glowM);glowM.userData.skin=s;glowM.userData.basic=1;
+ const add=(geo,x,y,z,m)=>{const me=new THREE.Mesh(geo,m||glowM);me.position.set(x,y,z);me.userData.skinAtt=1;g.add(me);return me};
+ if(s.att==='strip'||s.att==='charm'||s.att==='fins'||s.att==='plates'||s.att==='crystal'){for(const sd of [-1,1])add(new THREE.BoxGeometry(.003,.006,L*.45),sd*.037,.01,-L*.45)}
+ if(s.att==='charm'){const cord=add(new THREE.CylinderGeometry(.002,.002,.05,5),.04,-.05,-L*.2,new THREE.MeshStandardMaterial({color:0x222222}));const c=add(new THREE.OctahedronGeometry(.016,0),.04,-.08,-L*.2,skinMat(s,'body'));c.userData.spin=1}
+ if(s.att==='fins'){for(let i=0;i<4;i++){const f=add(new THREE.BoxGeometry(.004,.03,.05),0,.07,-L*.3-i*.07,skinMat(s,'body'));f.rotation.x=-.4}add(new THREE.TorusGeometry(.024,.004,6,16),0,.015,-L-.03)}
+ if(s.att==='plates'){for(let i=0;i<5;i++)for(const sd of [-1,1]){const p=add(new THREE.BoxGeometry(.004,.035,.05),sd*.042,-.01,-L*.25-i*.06,skinMat(s,'body'));p.rotation.z=sd*.25}}
+ if(s.att==='crystal'){const c=add(new THREE.OctahedronGeometry(.03,0),0,-.06,-L*.6);c.scale.set(.6,1.4,.6);c.userData.spin=1;add(new THREE.TorusGeometry(.03,.003,6,18),0,.015,-L-.02)}}
+function applySkin(g,id,skinId){const s=SKIN[skinId];if(!s||!W[id])return;const v=W[id].vm;let L=v.len;
+ g.traverse(o=>{if(!o.isMesh||o.userData.col===undefined)return;if(o.userData.col===v.col)o.material=skinMat(s,'body');else if(o.userData.col===v.acc)o.material=skinMat(s,'acc')});
+ if(RAR_ORDER.indexOf(s.rar)>=2)skinAttach(g,s,L);g.userData.skin=skinId}
+function skinTick(t){for(const m of SKANIM){const s=m.userData.skin;if(!s)continue;
+ if(s.anim==='pulse'){const k=.6+.6*(.5+.5*Math.sin(t*2.6));if(m.userData.basic)m.color.set(s.glow).multiplyScalar(k);else m.emissiveIntensity=k*1.3}
+ else if(s.anim==='flow'){if(m.emissiveMap)m.emissiveMap.offset.set(t*.05,t*.12);else m.color.set(s.glow).multiplyScalar(.7+.3*Math.sin(t*4))}
+ else if(s.anim==='hue'){const c=new THREE.Color().setHSL((t*.08)%1,.85,.55);if(m.userData.basic)m.color.copy(c);else{m.emissive.copy(c);if(s.pat==='holo'&&m.map)m.map.offset.set(t*.03,0)}}
+ else if(s.anim==='shine'){const k=.5+.8*Math.max(0,Math.sin(t*1.7))**8;if(m.userData.basic)m.color.set(s.gold).multiplyScalar(.6+k);else m.emissiveIntensity=k}}}
+// ---------- skinned icons (shared offscreen renderer, cached) ----------
+const SKICON={};let SKICON_V=0,skR=null;
+function skinIcon(gun,skinId,w,h){if(!skinId||!SKIN[skinId])return null;w=w||240;h=h||96;const k=gun+'|'+skinId+'|'+w;if(SKICON[k])return SKICON[k];
+ try{if(!skR){skR=new THREE.WebGLRenderer({alpha:true,antialias:true,preserveDrawingBuffer:true});skR.setPixelRatio(1);skR.userData={sc:new THREE.Scene()};const sc=skR.userData.sc;sc.add(new THREE.HemisphereLight(0xffffff,0x556070,1.1));const dl=new THREE.DirectionalLight(0xffffff,.8);dl.position.set(4,5,1);sc.add(dl)}
+  const sc=skR.userData.sc,obj=buildGun(gun,1,skinId);skR.setSize(w,h);sc.add(obj);const bb=new THREE.Box3().setFromObject(obj),c=bb.getCenter(new THREE.Vector3()),sz=bb.getSize(new THREE.Vector3());const asp=w/h,half=Math.max(sz.y/2,Math.max(sz.z,.05)/2/asp)*1.12;
+  const cam=new THREE.OrthographicCamera(-half*asp,half*asp,half,-half,.01,50);cam.position.set(c.x+5,c.y,c.z);cam.lookAt(c);skR.render(sc,cam);SKICON[k]=skR.domElement.toDataURL('image/png');sc.remove(obj);SKICON_V++;return SKICON[k]}catch(e){return null}}
+// ---------- who wears what ----------
+function equippedSkin(gun){return (typeof ACC!=='undefined'&&ACC.equipped&&ACC.equipped[gun])||''}
+function botSkin(pid,gun){const L=SKINS.filter(s=>s.gun===gun);if(!L.length||!G)return '';const r=srng(gun+'#'+pid+'#'+(G.seed||G.mapIdx||0))();return r<.45?L[Math.floor(r/.45*L.length)].id:''}

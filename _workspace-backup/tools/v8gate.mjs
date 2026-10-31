@@ -1,0 +1,94 @@
+// v8 DROP 2 GATE: seeded v7 DB (PGlite: v6 base + full v7 file) -> v8 section x2 -> whole file x2. Data preserved + new RPC behaviour.
+import {PGlite} from '@electric-sql/pglite';import {pgcrypto} from '@electric-sql/pglite/contrib/pgcrypto';import fs from 'fs';
+const all=fs.readFileSync('/workspace/arena-fps/supabase-setup.sql','utf8');const c8=all.indexOf('-- =====================================================================\n-- v8 MIGRATION');
+const v7file=all.slice(0,c8),v8=all.slice(c8);const v6=fs.readFileSync('/tmp/pgl/v6.sql','utf8');
+const db=new PGlite({extensions:{pgcrypto}});let pass=0,fail=0;
+const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);c?pass++:(fail++,process.exitCode=1)};const q=async(s,a)=>(await db.query(s,a)).rows;
+const err=async(s,a)=>{try{await db.query(s,a);return ''}catch(e){return e.message}};
+await db.exec(`create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key, raw_user_meta_data jsonb default '{}');
+create or replace function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('test.uid',true),'')::uuid $$;create publication supabase_realtime;`);
+await db.exec(v6);await db.exec(v7file);
+ok(c8>0&&v8.length>1000,'v8 section found ('+v8.split('\n').length+' lines)');
+const U=[1,2,3,4,5].map(i=>String(i).repeat(8)+'-'+String(i).repeat(4)+'-'+String(i).repeat(4)+'-'+String(i).repeat(4)+'-'+String(i).repeat(12));
+const N=['TwentyFivCent','weebier','PurpleJay83','casualjoe','Sniper_Sue'];
+const skins=await q(`select id,gun,crate_id from skins order by id`);ok(skins.some(s=>s.gun==='_char'),'v7 catalogue incl. characters: '+skins.length);
+const chars=skins.filter(s=>s.gun==='_char');
+for(let i=0;i<5;i++){await q(`insert into auth.users(id,raw_user_meta_data) values($1,$2)`,[U[i],{username:N[i]}]);
+ await q(`update profiles set money=$2,xp=$3,level=$4,kills=$5,wins=$6,settings=$7 where id=$1`,[U[i],1234+i*777,5000+i*311,7+i,120+i*9,30+i,{sens:1.5+i}]);
+ for(let k=0;k<3;k++){const s=skins[(i*7+k)%skins.length];await q(`insert into inventory(user_id,item_type,item_id,qty) values($1,'skin',$2,1) on conflict do nothing`,[U[i],s.id])}
+ const ch=chars[i%chars.length];await q(`insert into inventory(user_id,item_type,item_id,qty) values($1,'skin',$2,1) on conflict do nothing`,[U[i],ch.id]);await q(`insert into equipped(user_id,gun,skin_id) values($1,'_char',$2) on conflict do nothing`,[U[i],ch.id]);
+ await q(`insert into inventory(user_id,item_type,item_id,qty) values($1,'key','ember',$2),($1,'key','cast',2) on conflict do nothing`,[U[i],i+1]);
+ for(let m=0;m<3;m++)await q(`insert into match_history(user_id,map,mode,result,kills) values($1,'Dockyard 9',$2,$3,$4)`,[U[i],m?'online':'practice',m%2?'loss':'win',5+m+i])}
+const TABLES=['profiles','inventory','equipped','match_history','gun_stats','crates','skins','presence'];
+const strip=r=>{const c={...r};delete c.crates_opened;delete c.missions_reported_at;return JSON.stringify(c,Object.keys(c).sort())};
+const snap=async()=>{const o={};for(const t of TABLES)o[t]=(await q(`select * from ${t}`)).map(strip).sort();return o};
+const schema=async()=>(await q(`select table_name,column_name,data_type from information_schema.columns where table_schema='public' order by 1,2`)).map(r=>r.table_name+'.'+r.column_name+':'+r.data_type);
+const fns=async()=>(await q(`select p.proname||'('||pg_get_function_identity_arguments(p.oid)||')' f from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' order by 1`)).map(r=>r.f);
+const before=await snap(),sch0=await schema(),fn0=await fns();
+await db.exec(v8);const sch1=await schema(),fn1=await fns();await db.exec(v8);const a2=await snap(),sch2=await schema();
+await db.exec(all);await db.exec(all);const a3=await snap(),sch3=await schema(),fn3=await fns();
+ok(sch0.every(c=>sch1.includes(c)),'additive: all '+sch0.length+' v7 columns kept (v8 total '+sch1.length+')');
+ok(JSON.stringify(sch1)===JSON.stringify(sch2)&&JSON.stringify(sch2)===JSON.stringify(sch3),'idempotent schema across v8 x2 + whole file x2');
+ok(JSON.stringify(fn1)===JSON.stringify(fn3),'no duplicate/overloaded functions after re-running whole file ('+fn3.length+' fns)');
+ok(fn0.every(f=>fn3.includes(f)),'every v7 function signature still exists');
+for(const t of TABLES)ok(JSON.stringify(a2[t])===JSON.stringify(before[t])&&JSON.stringify(a3[t])===JSON.stringify(before[t]),`${t}: all ${before[t].length} v7 rows identical after v8 x2 + full x2`);
+ok((await q(`select count(*)::int c from profiles where crates_opened<>0`))[0].c===0,'crates_opened defaults to 0 for existing players');
+const ms=await q(`select tier,count(*)::int c,min(reward) lo,max(reward) hi from missions group by tier order by tier`);
+ok(ms.reduce((a,r)=>a+r.c,0)>=50&&ms.length===3&&Math.min(...ms.map(r=>r.lo))>=25&&Math.max(...ms.map(r=>r.hi))<=200,'mission pool: '+ms.map(r=>r.tier+'='+r.c).join(' ')+', rewards $25-$200');
+// DST-safe LA 4 AM day boundary
+const day=async t=>(await q(`select (((timestamptz '${t}') at time zone 'America/Los_Angeles') - interval '4 hours')::date::text d`))[0].d;
+ok(await day('2026-07-15 10:59:00+00')==='2026-07-14'&&await day('2026-07-15 11:00:00+00')==='2026-07-15','PDT: 3:59 AM -> previous day, 4:00 AM -> new day');
+ok(await day('2026-01-15 11:59:00+00')==='2026-01-14'&&await day('2026-01-15 12:00:00+00')==='2026-01-15','PST: 3:59 AM -> previous day, 4:00 AM -> new day');
+ok(await day('2026-03-08 11:00:00+00')==='2026-03-08'&&await day('2026-11-01 11:59:00+00')==='2026-10-31'&&await day('2026-11-01 12:00:00+00')==='2026-11-01','DST change days roll at local 4 AM');
+ok((await q(`select mission_day()::text d`))[0].d===await day(new Date().toISOString()),'mission_day() uses the same formula');
+// ---- as player 4
+const me=U[3];await db.exec(`set test.uid='${me}'`);await db.exec('set role authenticated');
+const m0=(await q(`select money from profiles where id=$1`,[me]))[0].money;
+const mm=await q(`select * from my_missions()`);ok(mm.length===3&&mm.map(r=>r.tier).join()==='easy,medium,hard','my_missions: 3 dailies easy/medium/hard: '+mm.map(r=>r.id).join(','));
+ok(JSON.stringify(await q(`select id from my_missions()`))===JSON.stringify(mm.map(r=>({id:r.id}))),'same missions on repeat call (stable for the day)');
+ok(/not complete/.test(await err(`select claim_mission(0)`)),'claim before completion refused');
+ok(/permission|denied|policy/i.test(await err(`update mission_progress set progress=999`))||(await q(`select max(progress) m from mission_progress`))[0].m<999,'cannot write mission_progress directly');
+ok(/permission|denied|policy/i.test(await err(`insert into mission_progress(user_id,day,slot,mission_id) values($1,current_date+5,0,'e_kills')`,[me])),'cannot insert mission rows directly');
+ok(/permission|denied/i.test(await err(`update profiles set money=999999 where id=$1`,[me]))||(await q(`select money from profiles where id=$1`,[me]))[0].money!==999999,'cannot edit own money');
+ok(/permission|denied/i.test(await err(`select * from mission_caps`)),'mission_caps hidden');
+ok(/no recent match/.test(await err(`select mission_report('{"kills":99}')`)),'mission_report without a fresh match refused');
+const big=JSON.stringify(Object.fromEntries(mm.map(r=>[r.stat,1e6])));
+// practice match -> no progress
+await q(`select report_match('win',5,1,1,'Dockyard 9','practice',6,2,800,'[]'::jsonb,false)`);
+await q(`select mission_report($1::jsonb)`,[big]);ok((await q(`select sum(progress)::int s from mission_progress where day=mission_day()`))[0].s===0,'practice match: progress stays 0');
+ok(/already reported/.test(await err(`select mission_report($1::jsonb)`,[big])),'second report for the same match refused');
+await db.exec('reset role');await q(`update profiles set last_report=now()-interval '61 seconds' where id=$1`,[me]);await db.exec('set role authenticated');
+await q(`select report_match('win',5,1,1,'Dockyard 9','online',6,2,800,'[]'::jsonb,false)`);
+await q(`select mission_report($1::jsonb)`,[big]);const pr=await q(`select * from my_missions()`);
+ok(pr.every(r=>r.progress<=r.goal&&r.progress>0),'online match counts; progress clamped to goal/caps: '+pr.map(r=>r.progress+'/'+r.goal).join(' '));
+const done=pr.filter(r=>r.progress>=r.goal);const mB=(await q(`select money from profiles where id=$1`,[me]))[0].money;
+if(done.length){const r=done[0];const p2=(await q(`select (claim_mission($1)).money m`,[r.slot]))[0].m;ok(p2===mB+r.reward,'claim pays exactly the reward: +$'+r.reward);
+ ok(/already claimed/.test(await err(`select claim_mission($1)`,[r.slot])),'double claim refused')}else ok(false,'no mission completed by capped report');
+ok(/no such mission/.test(await err(`select claim_mission(7)`)),'bad slot refused');
+// ---- crates: duplicate refund + count
+await db.exec('reset role');await q(`insert into inventory(user_id,item_type,item_id,qty) select $1,'skin',id,1 from skins where crate_id='cast' on conflict (user_id,item_type,item_id) do update set qty=greatest(inventory.qty,1)`,[me]);
+await db.exec('set role authenticated');const k0=(await q(`select money,crates_opened from profiles where id=$1`,[me]))[0];
+const o=(await q(`select open_crate2('cast') j`))[0].j;const k1=(await q(`select money,crates_opened from profiles where id=$1`,[me]))[0];
+ok(o.gun==='_char'&&o.dup===true&&o.refund===45&&k1.money===k0.money+45&&k1.crates_opened===k0.crates_opened+1,'duplicate drop refunds 10% of key price ($45 of $450) and counts the crate');
+await db.exec('reset role');await q(`delete from inventory where user_id=$1 and item_type='skin' and item_id in (select id from skins where crate_id='cast')`,[me]);await db.exec('set role authenticated');
+const o2=(await q(`select (open_crate('cast')).gun g`))[0].g;const k2=(await q(`select money,crates_opened from profiles where id=$1`,[me]))[0];
+ok(o2==='_char'&&k2.money===k1.money&&k2.crates_opened===k1.crates_opened+1,'new drop via legacy open_crate(): no refund, still counted');
+ok(/no key/.test(await err(`select open_crate2('cast')`)),'no key -> refused');
+const lb=await q(`select * from leaderboard_v8 where username='casualjoe'`);ok(lb.length===1&&lb[0].crates_opened===2&&lb[0].char_id&&'deaths' in lb[0],'leaderboard_v8 exposes crates_opened + char + stats: '+JSON.stringify(lb[0]));
+ok(Object.keys(lb[0]).every(k=>!['money','settings','id','xp'].includes(k)),'leaderboard_v8 exposes no money/settings/id');
+// ---- party matchmaking (anon)
+await db.exec('reset role');await db.exec(`set test.uid=''`);await db.exec('set role anon');
+const T=i=>'ticket'+String(i).padStart(12,'0');for(const i of [1,2,3,4])await q(`select mm_join($1,$2)`,[T(i),'P'+i]);
+await q(`select mm_party($1,'PTY42')`,[T(2)]);await q(`select mm_party($1,'PTY42')`,[T(4)]);
+ok(/bad party/.test(await err(`select mm_party($1,'x y')`,[T(1)])),'bad party code refused');
+await q(`select mm_poll($1,20)`,[T(1)]);await db.exec('reset role');const rows=await q(`select ticket,status,team_slot,room_code from mm_queue order by ticket`);
+const team=s=>s<2?0:1;const t2=rows.find(r=>r.ticket===T(2)),t4=rows.find(r=>r.ticket===T(4));
+ok(rows.every(r=>r.status==='matched')&&new Set(rows.map(r=>r.room_code)).size===1&&team(t2.team_slot)===team(t4.team_slot)&&new Set(rows.map(r=>r.team_slot)).size===4,'party of 2 matched on the same team: '+rows.map(r=>r.ticket.slice(-1)+':'+r.team_slot).join(' '));
+await q(`delete from mm_queue`);await db.exec('set role anon');
+for(const i of [5,6,7])await q(`select mm_join($1,$2)`,[T(i),'P'+i]);await q(`select mm_party($1,'DUO7')`,[T(6)]);await q(`select mm_party($1,'DUO7')`,[T(7)]);
+await db.exec('reset role');await q(`update mm_queue set created_at=now()-interval '30 seconds'`);await db.exec('set role anon');await q(`select mm_poll($1,20)`,[T(5)]);await db.exec('reset role');
+const r2=await q(`select ticket,team_slot from mm_queue order by ticket`);ok(team(r2[1].team_slot)===team(r2[2].team_slot)&&team(r2[0].team_slot)!==team(r2[1].team_slot),'fill-after-timeout: party kept together, solo on other team');
+await db.exec('set role anon');ok(/permission|denied/i.test(await err(`select * from mission_progress`))||(await q(`select * from mission_progress`)).length===0,'anon reads no mission progress');
+ok(/permission|denied/i.test(await err(`select claim_mission(0)`)),'anon cannot call claim_mission');
+await db.exec('reset role');
+console.log(`\nV8 GATE: ${pass} passed, ${fail} failed`);

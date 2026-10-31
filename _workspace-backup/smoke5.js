@@ -1,0 +1,10 @@
+require('./testguard');const puppeteer=require('puppeteer-core');
+(async()=>{const q=process.argv[2]||'medium',map=process.argv[3]||'0',secs=+(process.argv[4]||12),shot=process.argv[5];
+const b=await puppeteer.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox','--use-gl=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist','--window-size=1280,720','--autoplay-policy=no-user-gesture-required']});
+const pg=await b.newPage();await pg.setViewport({width:1280,height:720});const errs=[];
+pg.on('console',m=>{if(m.type()==='error')errs.push(m.text())});pg.on('pageerror',e=>errs.push('PAGE '+e.message));pg.on('error',e=>console.log('CRASH',e.message));pg.on('framedetached',()=>console.log('DETACH'));
+await pg.goto(`http://localhost:8765/index.html?q=${q}&speed=${process.env.SP||1}&autoplay&practice&map=${map}`);
+await new Promise(r=>setTimeout(r,secs*1000));
+const st=await pg.evaluate(()=>{const G=window.__G;return G?{rs:G.rs,rn:G.rn,sc:G.sc,el:G.el,hp:G.P.map(p=>p.hp),stuck:window.__botStuckMax,asserts:(window.__spawnAsserts||[]).slice(0,3)}:null});
+console.log(JSON.stringify(st));if(shot)await pg.screenshot({path:shot});
+console.log('ERRS',errs.length,errs.slice(0,8).join('\n'));await b.close()})();

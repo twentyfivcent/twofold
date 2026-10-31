@@ -1,0 +1,26 @@
+// ===== V8.1 (M) knife pickups: credit was lost when the picker's lethal slot wasn't the Talon Knife (utilAdd fell through to utilN, which
+// utilSlot overwrites every tick), and clients never got the host's count (inventory isn't in snapshots). Now:
+//  - a picked-up knife with no knife slot becomes an EXTRA knife (p.xKn). G throws extra knives first (HUD shows Talon Knife xN), then the own lethal returns.
+//  - the host's kpick event carries the authoritative inventory; the picking client adopts it.  - round reset (equip) clears extras.
+function invOf(p){return {lth:p.lth,ln:p.lthN,tcu:p.tcu,tn:p.tacN,x:p.xKn|0,ls:p._ls?[p._ls.lth,p._ls.n]:null,ua:p.uAct}}
+function invSet(p,v){if(!v||!p)return;p.lth=v.lth;p.lthN=v.ln;p.tcu=v.tcu;p.tacN=v.tn;p.xKn=v.x|0;p._ls=v.ls?{lth:v.ls[0],n:v.ls[1]}:null;p.utilN=p.uAct==='t'?p.tacN:p.lthN;p.util=p.uAct==='t'?p.tcu:p.lth}
+{const _ua=utilAdd;utilAdd=function(p,t,d){if(t==='knife'&&p.lth!=='knife'&&p.tcu!=='knife'&&(d>0||(p.xKn|0)>0)){p.xKn=Math.max(0,(p.xKn|0)+d);return}return _ua(p,t,d)}}
+{const _uh=utilHas;utilHas=function(p,t){return _uh(p,t)||(t==='knife'&&(p.xKn|0)>0)}}
+{const _us=utilSlot;utilSlot=function(p,inp,dt){
+ if(p.lth&&(p.xKn|0)>0&&!p._ls&&p.lth!=='knife'&&p.cook<0){p._ls={lth:p.lth,n:p.uAct==='t'?p.lthN:p.utilN};p.lth='knife';p.lthN=p.xKn;p.xKn=0;if(p.uAct!=='t'){p.utilN=p.lthN;p.util='knife'}}
+ const r=_us(p,inp,dt);
+ if(p._ls&&p.lth==='knife'&&p.lthN<=0&&p.cook<0){p.lth=p._ls.lth;p.lthN=p._ls.n;p._ls=null;if(p.uAct!=='t'){p.utilN=p.lthN;p.util=p.lth}}
+ return r}}
+{const _eq=equip;equip=function(p,lo){p.xKn=0;p._ls=null;return _eq.apply(this,arguments)}}
+{const _em=emit;emit=function(e){if(e&&e.t==='kpick'&&G&&G.P[e.s])e.inv=invOf(G.P[e.s]);return _em(e)}}
+{const _he=handleEvent;handleEvent=function(e){if(e&&e.t==='kpick'&&!HOST&&G&&e.s===ME&&e.inv){const me=G.P[ME];if(me)invSet(me,e.inv);window.__kpickSync=(window.__kpickSync||0)+1}return _he.apply(this,arguments)}}
+// ===== V8.1 (L) emotes cut off after ~0.15s: emoCancelCheck treated WHL as "wheel moved", but WHL is the TIMESTAMP of the last weapon-wheel
+// scroll (never reset), so anyone who had scrolled once (common since v8's scroll-to-melee) cancelled every emote at the 150ms grace mark.
+// Now only a scroll / swap / cook / melee / reload / crouch that STARTS after the emote began cancels it, plus the real input keys.
+emoCancelCheck=function(me){if(!me.emo)return;const e=me.emo,age=performance.now()-e.t0;let why='';if(!me.alive)why='dead';else if(me._emoHp!==undefined&&me.hp<me._emoHp)why='damage';
+ else if(age>150){for(const k of EMO_CANCEL)if(down(k)){why=k;break}
+  if(!why){const eb=down('emote');if(e._b!==undefined&&eb&&!e._b)why='emote';e._b=eb}
+  if(!why){if(WHL>e.t0)why='wheel';else if(e._a===undefined)e._a=[me.swapT>0,me.cook>=0,me.meleeT>0,me.reloadT>0,!!me.crouch];else{const a=[me.swapT>0,me.cook>=0,me.meleeT>0,me.reloadT>0,!!me.crouch];if(a.some((v,i)=>v&&!e._a[i]))why='action';e._a=a}}}
+ if(why)emoCancel(me,why)};
+// pickup rule (host-authoritative): knife-lethal players refill up to the normal cap; everyone else can carry up to KNIFE_XCAP extra knives.
+const KNIFE_XCAP=2;function knifeCanPick(p){if(p.lth==='knife'&&!p._ls)return utilCount(p,'knife')<UT.knife.c;if(p.tcu==='knife')return p.tacN<UT.knife.c;const x=(p.xKn|0)+(p._ls&&p.lth==='knife'?p.lthN:0);return x<KNIFE_XCAP}

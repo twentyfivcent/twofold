@@ -1,0 +1,17 @@
+// ===== V8.1 connectivity hardening: relay-only (TURN) fallback for joins + rejoins, fresh ICE on rejoin, send backpressure, stall grace for heartbeat timeouts.
+const NETF={forceRelay:false,relayRetries:0,lastGap:0,big:0,dropped:0};window.__netf=NETF;
+{const _mk=mkPeer;mkPeer=function(id,ice){ice=ice||ICE;if(NETF.forceRelay)ice=Object.assign({},ice,{iceTransportPolicy:'relay'});const p=_mk(id,ice);try{p.__ice=ice}catch(e){}NETF.lastPolicy=ice.iceTransportPolicy||'all';return p}}
+// test hook: simulate a NAT that blocks direct links (only relay-policy peers connect)
+if(typeof FakePeer!=='undefined'){const _c=FakePeer.prototype.connect;FakePeer.prototype.connect=function(r,o){const s=window.__netSim;if(s&&s.failDirect&&!(this.__ice&&this.__ice.iceTransportPolicy==='relay')){const d=new FakeConn(this,r);d.send=()=>{};d.close=()=>{};return d}return _c.call(this,r,o)}}
+// snapshots are superseded every tick: drop them instead of piling into a congested channel (overflowing bufferedAmount closes it)
+{const _s=netSend;netSend=function(c,m){try{const dc=c&&c.dataChannel;if(dc&&m&&m.t==='snap'&&dc.bufferedAmount>262144){NETF.dropped++;return}}catch(e){}return _s(c,m)}}
+// join: if the direct attempt hasn't opened after 9s and a relay is set up, retry once with relay-only ICE
+{const _j=joinOnline;joinOnline=async function(code,_retry){NETF.forceRelay=!!_retry;const r=await _j(code);const seq=LOBBY&&LOBBY.seq;
+ if(!_retry&&relayOn())setTimeout(()=>{if(LOBBY&&LOBBY.seq===seq&&LOBBY.me<0&&!started&&!(hostConn&&hostConn.open)){NETF.relayRetries++;window.__netNote='relay retry';try{$('#menuMsg').textContent='Direct link blocked - retrying through the relay...'}catch(e){}joinOnline(code,true)}},9000);
+ else if(_retry)setTimeout(()=>{NETF.forceRelay=false},100);return r}}
+// rejoin: refresh ICE (relay creds expire), and from the 2nd attempt force the relay if one is set up
+{const _r=clientReconnect;clientReconnect=function(why){if(REJ&&REJ.busy)return _r(why);window.__rejoins=(window.__rejoins||0)+1;const n=(REJ?REJ.n:0)+1;
+ if(relayOn()&&n>=2&&!NETF.forceRelay){NETF.forceRelay=true;NETF.relayRetries++;try{if(peer&&!peer.destroyed)peer.destroy()}catch(e){}peer=null}
+ getIce().then(i=>{LAST_ICE=i}).catch(()=>{});return _r(why)}}
+// stall grace: after a long main-thread stall (map/podium build, tab hidden) queued packets haven't been processed yet; don't count that as silence
+{let lt=performance.now();setInterval(()=>{const n=performance.now();if(n-lt>2500){NETF.lastGap=n-lt;lastHeard=Math.max(lastHeard,n-1000);if(G&&HOST)for(const p of G.P)if(p.conn&&p.conn.lastHeard)p.conn.lastHeard=Math.max(p.conn.lastHeard,n-1000)}lt=n},500)}

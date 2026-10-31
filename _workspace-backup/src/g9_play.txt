@@ -1,0 +1,52 @@
+// ===================== v6 GAMEPLAY: tactical sprint, inspect, bot takeover, stamina HUD, view effects =====================
+let TACS=false,lastSprintDn=0;
+addEventListener('keydown',e=>{if(e.repeat||!G)return;if(e.code===kc('sprint')){const n=performance.now();if(n-lastSprintDn<300)TACS=true;lastSprintDn=n}});
+addEventListener('keyup',e=>{if(e.code===kc('sprint'))TACS=false});
+const INSP_T={rifle:2.4,smg:2.2,pistol:1.8,shotgun:2.4,sniper:2.8,lmg:2.8,launch:2.6,dmr:2.5,melee:1.9};
+function inspCls(w){return MELSEL?'melee':SND.cls(w)}
+function v6Press(code){const me=G.P[ME];
+ if(isKey(code,'inspect')&&me.alive&&G.rs!=='vote'&&G.rs!=='mapvote'){if(me.reloadT<=0&&me.swapT<=0&&!me.ads&&me.meleeT<=0){me.inspT=INSP_T[inspCls(curW(me))]||2.2;VK.insp=0;SND.ui(300)}return true}
+ if(isKey(code,'takeover')&&deadView()){const t=specTarget();if(t)requestTakeover(t.id);return true}
+ return false}
+// ---- bot takeover: dead human takes control of a living teammate bot for the rest of the round (host-authoritative, once per round)
+function canTakeover(from,to){const a=G.P[from],b=G.P[to];return G.rs==='live'&&a&&b&&!a.alive&&b.alive&&b.bot&&!b.pendConn&&a.team===b.team&&!a.bot&&!(G.took&&G.took[a.tkId||from])}
+function requestTakeover(to){if(HOST)hostTakeover(ME,to);else if(hostConn)netSend(hostConn,{t:'take',i:to})}
+function hostTakeover(from,to){if(!canTakeover(from,to)){if(from===ME)addKF('<span style="color:#f99">Takeover unavailable</span>');return false}
+ const a=G.P[from],b=G.P[to];G.took=G.took||{};const tk=a.tkId||from;G.took[tk]=1;
+ const nm=a.name;b.bname=b.name;b.name=nm;a.name=nm+"'s bot";b.bot=false;b.bot_=null;a.bot=true;a.bot_=null;b.tkId=tk;a.tkId=undefined;b.tkFrom=from;b.tk0={k:b.k|0,d:b.d|0,dmg:b.dmg||0,as:b.as|0,fc:b.fc|0,fp:b.fp||0};
+ b.conn=a.conn;a.conn=null;if(b.conn){b.conn.slot=to;netSend(b.conn,{t:'you',me:to})}
+ if(from===ME){ME=to;onBecome()}
+ emit({t:'n6',h:'<span style="color:#7fd0ff">'+esc(nm)+' took control of a teammate bot</span>'});return true}
+function onBecome(){MELSEL=false;VK.mel=0;G.specId=-1;SPEC.free=false;vmId=null;resetAim();const me=G.P[ME];me.inspT=0;if(pMeshes[ME])pMeshes[ME].visible=false;SND.ui(700)}
+function esc(s){return String(s).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}
+// ---- takeover prompt + stamina bar HUD
+function v6HUD(dt){let el=document.getElementById('v6hud');if(!el){el=document.createElement('div');el.id='v6hud';el.innerHTML='<div id="stamBar"><i></i></div><div id="tkPrompt"></div>';document.getElementById('hud').appendChild(el)}
+ const me=G.P[ME],sb=$('#stamBar'),st=me.stam===undefined?100:me.stam;sb.firstChild.style.width=st+'%';sb.classList.toggle('full',st>=99.5||!me.alive);sb.classList.toggle('low',st<25);sb.classList.toggle('tac',!!me.tac);
+ const tp=$('#tkPrompt');let t=null;if(deadView()&&G.rs==='live'){const s=specTarget();if(s&&s.bot&&s.team===me.team&&!(G.took&&G.took[me.tkId||ME]))t='Press <b>'+keyName(kc('takeover'))+'</b> to take control of '+esc(s.name)}tp.innerHTML=t||'';tp.style.display=t?'':'none'}
+// ---- viewmodel extras: sprint/tac lower, slide tilt + low camera, mantle dip, per-class inspect animations
+function vmExtras(dt,vp,spect){const me=vp,w=curW(vp);const u=vm.userData,gun=u.gun;
+ const sprintA=(me.sprinting||me.tac)&&me.moving&&!spect?1:0;VK.spr=(VK.spr||0)+(sprintA-(VK.spr||0))*Math.min(1,dt*8);VK.tac=(VK.tac||0)+((me.tac?1:0)-(VK.tac||0))*Math.min(1,dt*8);
+ const sl=(me.slideT>0||me.slideF)?1:0;VK.sl=(VK.sl||0)+(sl-(VK.sl||0))*Math.min(1,dt*10);const mt=(me.mant||me.mantF)?1:0;VK.mt=(VK.mt||0)+(mt-(VK.mt||0))*Math.min(1,dt*12);
+ vm.position.y-=VK.spr*.03+VK.tac*.09+VK.mt*.08;vm.position.x-=VK.tac*.05;vm.rotation.x-=VK.tac*.55;vm.rotation.y+=VK.spr*.25+VK.tac*.35;vm.rotation.z+=VK.sl*.25;
+ camera.position.y-=VK.sl*.35;camera.rotation.z+=VK.sl*.06;camera.rotation.x-=VK.mt*.08;
+ const ins=(me.inspT>0)||(spect&&me.inspF);if(ins){VK.insp=(VK.insp||0)+dt}else VK.insp=0;gun.rotation.set(0,0,0);gun.position.set(gun.userData.dual?gun.position.x:0,0,0);if(u.knife)u.knife.userData.spin=0;
+ if(VK.insp>0){const c=inspCls(w),T=INSP_T[c]||2.2,t=Math.min(1,VK.insp/T),e=Math.sin(Math.min(1,t*4)*Math.PI/2)*Math.sin(Math.min(1,(1-t)*4)*Math.PI/2);
+  if(c==='pistol'){vm.position.x-=.05*e;vm.rotation.y+=.6*e;const sp=t>.3&&t<.65?(t-.3)/.35:t>=.65?1:0;gun.rotation.x=-sp*Math.PI*2;}
+  else if(c==='sniper'){vm.rotation.z+=.7*e;vm.position.x-=.08*e;vm.position.y+=.03*e;const bo=t>.35&&t<.75?Math.sin((t-.35)/.4*Math.PI):0;gun.position.z=bo*.05;vm.rotation.x+=bo*.08}
+  else if(c==='shotgun'){vm.rotation.z+=.9*e;vm.rotation.y+=.3*e;const pm=t>.45&&t<.7?Math.sin((t-.45)/.25*Math.PI):0;gun.position.z=pm*.06}
+  else if(c==='lmg'){vm.position.y+=.06*e;vm.rotation.x+=.25*e;vm.rotation.z+=.4*e*Math.sin(t*Math.PI*2)}
+  else if(c==='launch'){vm.rotation.x+=.5*e;vm.position.z+=.05*e;vm.rotation.y+=.4*e*Math.sin(t*Math.PI)}
+  else if(c==='smg'){vm.rotation.y+=.8*e*Math.sin(t*Math.PI*1.5);vm.rotation.z+=.5*e;vm.position.x-=.04*e}
+  else if(c==='melee'){if(u.knife){u.knife.visible=true;u.knife.rotation.z+=VK.insp*0+Math.sin(t*Math.PI)*Math.PI*2*t;u.knife.rotation.y=e*1.2}}
+  else{vm.rotation.y+=.7*e;vm.rotation.z+=.35*e*Math.sin(t*Math.PI*2);vm.position.x-=.06*e;vm.position.y+=.02*e}}}
+function onSlide(p){if(!G)return;const pos=p.id===ME?null:[p.pos[0],p.pos[1],p.pos[2]];try{const g=SND.out(pos,.5);if(g){const t=AC.currentTime;SND.nz(g,t,.55,'bandpass',900,.8,.6,0);SND.nz(g,t,.3,'lowpass',300,1,.5)}}catch(e){}}
+function onMantle(p){if(!G)return;const pos=p.id===ME?null:[p.pos[0],p.pos[1],p.pos[2]];try{const g=SND.out(pos,.45);if(g){const t=AC.currentTime;SND.nz(g,t,.12,'lowpass',600,1,.7);SND.nz(g,t+.15,.1,'bandpass',1500,2,.4)}}catch(e){}}
+
+// v8: takeovers last only until the round ends: control returns to your own slot, and the stats you earned while driving the bot
+// move to your slot (so MVP + match money go to your account, never to "X's bot").
+function revertTakeovers(){if(!G||!HOST)return;for(const b of G.P){if(b.tkFrom===undefined)continue;const a=G.P[b.tkFrom];const z=b.tk0||{};
+ if(a){for(const k of ['k','d','as','fc'])a[k]=(a[k]|0)+Math.max(0,(b[k]|0)-(z[k]|0)),b[k]=z[k]|0;for(const k of ['dmg','fp'])a[k]=(a[k]||0)+Math.max(0,(b[k]||0)-(z[k]||0)),b[k]=z[k]||0;
+  const nm=b.name;a.name=nm;a.bot=false;a.bot_=null;a.tkId=b.tkId;a.conn=b.conn;b.conn=null;b.bot=true;b.bot_=null;b.name=b.bname||botNameFor(b);
+  if(a.conn){a.conn.slot=a.id;netSend(a.conn,{t:'you',me:a.id})}if(ME===b.id){ME=a.id;onBecome();if(pMeshes[b.id])pMeshes[b.id].visible=true}}
+ b.tkFrom=undefined;b.tkId=undefined;b.tk0=null}}
+function botNameFor(b){return b.origName||('Bot '+b.id)}

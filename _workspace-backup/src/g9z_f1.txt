@@ -1,0 +1,10 @@
+// ===== V8.1: smooth menu map-pan switches. Root cause: each switch generated the new map's canvas textures (+normal/roughness maps) and compiled its shaders synchronously on one frame.
+// Fix: (1) while the current pan is on screen, pre-generate the NEXT map's textures one per frame (cached in TEXC/NRMC, identical output); (2) after any buildMap, warm shaders with renderer.compile so the first visible frame doesn't stall.
+const MWARM={i:-1,q:[],names:{}};
+function mwNames(m){const s=JSON.stringify([m.half,m.center,m.spawnCover,m.tex,m.floor&&0]);const o=[];for(const k of Object.keys(TEXGEN))if(s.indexOf('"'+k+'"')>=0)o.push(k);for(const k of Object.values(m.tex||{}))if(k&&!o.includes(k))o.push(k);return o}
+function mwStep(){if(MPAN.i<0||!MAPS.length)return;const nx=(MPAN.i+1)%MAPS.length;if(MWARM.i!==nx){MWARM.i=nx;MWARM.q=[];for(const n of mwNames(MAPS[nx])){MWARM.q.push(['t',n]);if(settings.quality!=='low')MWARM.q.push(['d',n])}}
+ const el=performance.now()/1000-MPAN.t0;if(el<1.6||el>MPAN.dur-1.4)return;// stay out of the fades
+ const j=MWARM.q.shift();if(!j)return;try{const t=j[0]==='t'?tex(j[1]):derived(j[1]);const tt=j[0]==='t'?[t]:[t.n,t.r];if(renderer.initTexture)for(const x of tt)if(x)renderer.initTexture(x)}catch(e){}}
+{const _mp=menuPan;menuPan=function(){const r=_mp.apply(this,arguments);try{mwStep()}catch(e){}return r}}
+{const _bm=buildMap;buildMap=function(m){const r=_bm.apply(this,arguments);try{if(mapGroup&&renderer.compile){const a=performance.now();renderer.compile(scene,camera);window.__compileMs=performance.now()-a}}catch(e){}return r}}
+window.__mwarm=()=>({next:MWARM.i,left:MWARM.q.length});

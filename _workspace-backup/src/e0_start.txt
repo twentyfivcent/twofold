@@ -1,0 +1,34 @@
+// ===================== GAME START / SNAPSHOT APPLY =====================
+function startGame(cfg){
+ HOST=cfg.host;lastHeard=performance.now();if(typeof MUS!=='undefined')MUS.setScene('game');if(typeof MSTAT_reset==='function')MSTAT_reset();ME=cfg.me;started=true;
+ const m=MAPS[cfg.map];
+ G={tod:cfg.tod||(cfg.host?rollTod(cfg.map):'day'),mapIdx:cfg.map,mapDef:m,boxes:null,P:[0,1,2,3].map(mkPlayer),rs:'pre',rt:PRE_TIME,el:0,sc:[0,0],rn:0,ss:0,lo:['kestrel','sparrow','frag','smoke'],nades:[],smokes:[],flag:{on:false,team:-1,p:0,pos:m.flag.slice(),n:'Centre'},win:-2,lastPrim:null,ff:!!cfg.ff,decoys:[],mines:[],pads:[],heals:[],knives:[],mvotes:[-1,-1,-1,-1],mopts:null,nextMap:-1};
+ G.boxes=buildBoxes(m);
+ cfg.slots.forEach((s,i)=>{G.P[i].name=s.name;G.P[i].bot=s.bot;G.P[i].conn=s.conn||null;G.P[i].off=!!s.off;if(s.off){G.P[i].alive=false;G.P[i].pos=[0,-60,0]}});
+ for(const p of pMeshes)scene.remove(p);pMeshes=G.P.map(p=>buildPlayerMesh(p,false));
+ buildMap(m);vmId=null;for(const k in itemMeshes){scene.remove(itemMeshes[k]);delete itemMeshes[k]}resetAim();kfList=[];EV=[];wasLocked=false;
+ ['#menu','#lobby','#pause','#pracSetup'].forEach(s=>$(s).classList.add('hide'));$('#hud').classList.remove('hide');
+ if(HOST)roundStart();
+ if(!OVERVIEW&&!AUTOPLAY)lockPointer();
+ window.__G=G;if(typeof voiceUpdate==='function')voiceUpdate();
+}
+function applySnap(s){
+ if(!G)return;
+ G.rs=s.rs;G.rt=s.rt;G.el=s.el;G.sc=s.sc;G.rn=s.rn;G.lo=s.lo;G.win=s.win;G.flag=s.fl;if(s.td&&s.td!==G.tod){G.tod=s.td;buildMap(G.mapDef)}G.opts=s.op;G.votes=s.vt;G.voteWin=s.vw;G.ff=!!s.ff;G.vp=s.vp;G.mopts=s.mo||null;G.mvotes=s.mv||[-1,-1,-1,-1];G.nextMap=s.nm===undefined?-1:s.nm;
+ G.boxes=G.boxes.filter(b=>!b.dyn).concat((s.D||[]).map(a=>({dyn:a[0],min:[a[1],a[2],a[3]],max:[a[4],a[5],a[6]],col:0x6fb6ff})));
+ const resp=s.ss!==G.ss;G.ss=s.ss;
+ G.waiting=!!s.P[ME][12];
+ s.P.forEach((a,i)=>{const p=G.P[i];p.hp=a[5];p.alive=!!a[6];p.k=a[9];p.d=a[10];p.dmg=a[11];p.bot=!!a[12];p.name=a[13];p.relF=!!a[15];p.cloakF=!!a[16];p.off=!!a[17];p.empF=!!a[18];p.melF=!!a[19];if(i!==ME){p.ads=!!a[14];p.held=a[20];p.skinCur=a[21]||'';p.inspF=!!a[22];p.slideF=!!a[23];p.mantF=!!a[24]}
+  if(i!==ME||resp||G.waiting){p.pos=[a[0],a[1],a[2]];p.yaw=a[3];p.pitch=a[4];p.crouch=!!a[7];if(i!==ME){p.cur=0;p.inv[0].w=WIDS[a[8]]||'kestrel'}}
+  if(resp){p.rpos=p.pos.slice();p.ryaw=p.yaw}
+  if(i===ME&&resp){p.vel=[0,0,0];equip(p,s.lo)}});
+ G.nades=s.N.map(n=>({id:n[0],type:n[1],pos:[n[2],n[3],n[4]],owner:n[5]}));
+ G.smokes=s.S.map(a=>({id:a[0],pos:[a[1],a[2],a[3]],r:a[4]}));
+ G.knives=(s.K||[]).map(a=>({id:a[0],pos:[a[1],a[2],a[3]],yaw:a[4],pitch:a[5],stuck:!!a[6]}));
+ G.decoys=(s.Dc||[]).map(a=>({id:a[0],team:a[1],pos:[a[2],a[3],a[4]],yaw:a[5]}));
+ G.mines=(s.Mn||[]).map(a=>({id:a[0],team:a[1],pos:[a[2],a[3],a[4]],end:[a[5],0,a[6]]}));
+ G.pads=(s.Pd||[]).map(a=>({id:a[0],team:a[1],pos:[a[2],a[3],a[4]]}));
+ G.heals=(s.Hl||[]).map(a=>({id:a[0],team:a[1],pos:[a[2],a[3],a[4]],t:a[5]}));
+ for(const e of s.ev)handleEvent(e);
+}
+

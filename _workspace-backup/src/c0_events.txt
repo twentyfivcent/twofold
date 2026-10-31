@@ -1,0 +1,47 @@
+// ===================== EVENTS (run on every peer) =====================
+let kfList=[],hmT=0,hmHS=false,hmKill=false,dmgInd=[],flashT=0,bannerT=0,FLOATS=[],LIFE={taken:[],dealt:[],killer:null},SPEC={i:0,fc:null,fy:0,fp:0},SWAY=[0,0],SWT=0,BREATH=4,VOTEUI={key:''};
+function nm(i){const p=G.P[i];return p?`<span style="color:${p.team?'#ff9b3d':'#5aa8ff'}">${esc(p.name)}</span>${devB(p.name)}`:'?'}
+function banner(t,s){$('#banner').innerHTML=t;bannerT=s||2.5}
+function handleEvent(e){if(typeof MSTAT_ev==='function')MSTAT_ev(e);
+ if(!G)return;const me=G.P[ME];
+ if(e.t==='kf'){const w=W[e.w]?W[e.w].n:UT[e.w]?UT[e.w].n:e.w;addKF(`${nm(e.k)} <span style="color:#aaa">[${w}${e.hs?' HS':''}]</span> ${nm(e.v)}${e.tk?' <span style="color:#f66">TEAMKILL</span>':''}`);if(e.k===ME&&e.v!==ME)banner(`<span style="font-size:24px">ELIMINATED ${G.P[e.v].name}</span>`,1.2);if(e.v===ME){resetAim();banner('<span style="font-size:28px;color:#f66">YOU WERE ELIMINATED</span>',2);LIFE.killer={k:e.k,w:e.w,hs:e.hs};SPEC.i=0;SPEC.fc=null}}
+ else if(e.t==='hit'){if(e.s===ME&&e.v!==ME){hmT=.3;hmHS=e.hs||e.kill;hmKill=e.kill;SND.hit(e.hs,e.kill);if(settings.dmgNums!==false&&e.p)FLOATS.push({p:e.p.slice(),a:Math.round(e.amt),hs:e.hs,t:1,ox:rnd(-.3,.3),pen:e.pen|0})}}
+ else if(e.t==='dmg'){if(e.v===ME||e.v===G.specId){dmgInd.push({x:e.x,z:e.z,t:1.4,v:e.v});HITF=1}if(e.v===ME){LIFE.taken.push(e);SND.hurt()}if(e.a===ME&&e.v!==ME)LIFE.dealt.push(e)}
+ else if(e.t==='n6'){addKF(e.h)}
+ else if(e.t==='tr'){if(e.s!==ME){addTracer(e.o,e.e,false,e.s);if(e.w)addImpact(e.e,norm([e.e[0]-e.o[0],e.e[1]-e.o[1],e.e[2]-e.o[2]]))}}
+ else if(e.t==='fx'){if(e.s!==ME&&W[e.w])SND.shot(W[e.w],[e.x,e.y,e.z]);if(e.s>=0&&e.s!==ME){fxLight([e.x,e.y,e.z],0xffc070,2,.06);if(G.specId===e.s){VK.kick=1;VK.flash=.05;VK.alt=!VK.alt;ejectCasing(W[e.w])}}}
+ else if(e.t==='boom'){addBoom(e.x,e.y,e.z);SND.boom([e.x,e.y,e.z])}
+ else if(e.t==='clink'){SND.clink([e.x,e.y,e.z])}
+ else if(e.t==='round'){if(typeof MUS!=='undefined')MUS.roundSting();resetAim();LIFE={taken:[],dealt:[],killer:null};SPEC={i:0,fc:null,fy:0,fp:0};G.myVote=-1;for(const p of G.P)p.revealT=0;SND.sting('vote')}
+ else if(e.t==='voted'){const lo=G.opts&&G.opts[e.i];if(lo)banner(`<span style="font-size:26px">LOADOUT: ${W[lo[0]].n}</span>`,2)}
+ else if(e.t==='stim'){if(e.s===ME)addKF('<span style="color:#7f7">+50 HP</span>');SND.ui(990)}
+ else if(e.t==='shield'){SND.clink([e.x,1,e.z])}
+ else if(e.t==='pulse'){if(e.team===me.team){for(const i of e.ids)G.P[i].revealT=4;addKF(`<span style="color:#f88">Echo Pulse: ${e.ids.length} enem${e.ids.length===1?'y':'ies'} revealed</span>`)}SND.sting('vote')}
+ else if(e.t==='pop'){addBoom(e.x,e.y,e.z,e.heal?0x40ff80:e.dec?0x8fc8ff:0xcccccc,1.5);if(e.heal)SND.heal([e.x,e.y,e.z])}
+ else if(e.t==='bl'){addBlood(e)}
+ else if(e.t==='mel'){SND.swing(e.s===ME?null:G.P[e.s]&&G.P[e.s].rpos);if(e.hit)SND.stab(G.P[e.s]&&G.P[e.s].rpos)}
+ else if(e.t==='note'){addKF(`<span style="color:#fc6">${e.m}</span>`)}
+ else if(e.t==='udep'){const n=UT[e.u]?UT[e.u].n:e.u;SND.deploy(G.P[e.s]&&G.P[e.s].rpos);if(e.s===ME)addKF(`<span style="color:#9cf">${n} deployed</span>`)}
+ else if(e.t==='cloak'){SND.cloak(G.P[e.s]&&G.P[e.s].rpos)}
+ else if(e.t==='rope'){addRope(e.s,e.pt);SND.rope(G.P[e.s]&&G.P[e.s].rpos)}
+ else if(e.t==='emp'){addBoom(e.x,e.y,e.z,0x5090ff,2.2);fxLight([e.x,e.y,e.z],0x5090ff,8,.3);SND.emp([e.x,e.y,e.z])}
+ else if(e.t==='beep'){SND.beep([e.x,e.y,e.z])}
+ else if(e.t==='kpick'){if(e.s===ME){pickMsg('Knife picked up');SND.ui(1200)}}
+ else if(e.t==='bstk'){SND.clink([e.x,e.y,e.z])}
+ else if(e.t==='mapvote'){resetAim();if(G&&G.qp){banner('<span style="font-size:30px">MATCH OVER</span>',1.5);SND.sting('vote')}else banner('<span style="font-size:30px">VOTE THE NEXT MAP</span>',1.5);SND.sting('vote')}
+ else if(e.t==='nextmap'){const mp=MAPS[e.m];banner(`<span style="font-size:30px">NEXT: ${mp?mp.n:''}</span>`,1.2);SND.sting('go')}
+ else if(e.t==='flash'){addBoom(e.x,e.y,e.z,0xffffff,3);if(me.alive){const ey=eye(me),p=[e.x,e.y,e.z],dd=dist3(ey,p);if(dd<20&&los(ey,p)){const f=norm([p[0]-ey[0],p[1]-ey[1],p[2]-ey[2]]),v=dirYP(me.yaw,me.pitch);const dot=f[0]*v[0]+f[1]*v[1]+f[2]*v[2];flashT=Math.max(flashT,(dot>.3?3.2:dot>-.2?1.4:.5)*(1-dd/24))}}}
+ else if(e.t==='go'){banner('FIGHT!',1.2);SND.sting('go')}
+ else if(e.t==='flagon'){banner('<span style="font-size:30px">OVERTIME FLAG IS UP - HOLD IT FOR 3s</span>',2.5)}
+ else if(e.t==='rend'){if(typeof MUS!=='undefined'&&e.win>=0)MUS.endSting(e.win===me.team);SND.sting(e.win===me.team?'win':'lose');const why={elim:'Team eliminated',flag:'Flag captured',time:'Time up - higher total team health'}[e.why];banner(e.win<0?`ROUND DRAW<div style="font-size:20px">${why}</div>`:`<span style="color:${e.win===me.team?'#7f7':'#f77'}">ROUND ${e.win===me.team?'WON':'LOST'}</span><div style="font-size:20px">${why}</div>`,3.5)}
+ else if(e.t==='over'){if(e.ps&&!HOST)e.ps.forEach((q,i)=>{const p=G.P[i];if(p){p.k=q[0];p.d=q[1];p.name=q[2];p.bot=!!q[3];p.dmg=q[4]}});const mvP=G.P[e.mvp];G.mvp={id:e.mvp,score:e.mvs,bot:!!e.mvb,name:e.mvn||(mvP?mvP.name:'?')};const iAmMvp=e.mvp===ME&&!e.mvb;if(typeof ACC!=='undefined')ACC.matchOver(e.win===me.team,iAmMvp,G.mvp);banner(`<span style="font-size:64px;color:${e.win===me.team?'#7f7':'#f77'}">${e.win===me.team?'VICTORY':'DEFEAT'}</span><div style="font-size:22px">${G.sc[0]} - ${G.sc[1]}</div>${mvpBadge(G.mvp,me)}${G.qp?"":`<div style="font-size:16px">Next map vote coming up...</div>`}`,6)}
+ else if(e.t==='joined'){addKF(`<span style="color:#aaa">${e.n} joined - takes over a bot next round</span>`)}
+ else if(e.t==='left'){addKF(`<span style="color:#aaa">${e.n} left - a bot took over</span>`)}
+}
+function addKF(h){kfList.push({h,t:5});if(kfList.length>5)kfList.shift()}
+
+
+function mvpBadge(m,me){if(!m||m.id<0)return '';const you=m.id===me.id;return `<div id="mvpBadge" style="display:inline-block;margin:10px auto;padding:8px 18px;border:2px solid #ffd24a;border-radius:10px;background:rgba(60,44,0,.75);font-size:20px;color:#ffe08a">&#9733; MVP: <b>${esc6(m.name)}</b> <span style="opacity:.8">(${m.score} pts)</span>${m.bot?'<div style="font-size:13px;color:#ccc">Bot MVP - no MVP bonus this match</div>':you?'<div style="font-size:14px;color:#9f9">+$150 MVP bonus</div>':''}</div>`}
+
+// v8: small fading prompt under the crosshair (was only a killfeed line, easy to miss)
+function pickMsg(t){const el=document.getElementById('pickMsg');if(!el)return;el.textContent=t;el.classList.add('on');window.__pickMsg=t;clearTimeout(pickMsg.t);pickMsg.t=setTimeout(()=>el.classList.remove('on'),900)}

@@ -1,0 +1,138 @@
+// ===================== v7 UI: fullscreen, minimap, back-to-lobby, loadout vote v2, crate icons, skin viewer =====================
+// ---- fullscreen
+function fsEl(){return document.fullscreenElement||document.webkitFullscreenElement||null}
+function fsHint(t){let h=document.getElementById('fsHint');if(!h){h=document.createElement('div');h.id='fsHint';h.style.cssText='position:fixed;left:50%;top:18px;transform:translateX(-50%);background:#14202c;border:1px solid #4a7aa8;color:#dff;padding:8px 14px;border-radius:8px;z-index:60;font:14px system-ui;pointer-events:none';document.body.appendChild(h)}h.textContent=t;h.style.display='block';clearTimeout(fsHint.t);fsHint.t=setTimeout(()=>h.style.display='none',4000)}
+let FS_RELOCK=false;
+// v7: must run inside the click/key handler (user gesture). In an itch.io iframe without allowfullscreen this is refused -> hint.
+function toggleFS(){const d=document,el=d.documentElement;try{
+ if(fsEl()){(d.exitFullscreen||d.webkitExitFullscreen).call(d);return}
+ const en=d.fullscreenEnabled!==undefined?d.fullscreenEnabled:!!d.webkitFullscreenEnabled;const req=el.requestFullscreen||el.webkitRequestFullscreen;
+ if(!en||!req){fsHint('Use the fullscreen button under the game window');window.__fsLast='blocked';return}
+ FS_RELOCK=!!(G&&typeof locked!=='undefined'&&locked);
+ const r=req.call(el,{navigationUI:'hide'});window.__fsLast='requested';if(r&&r.catch)r.catch(()=>{window.__fsLast='rejected';fsHint('Use the fullscreen button under the game window')})}catch(e){window.__fsLast='rejected';fsHint('Use the fullscreen button under the game window')}}
+function syncFS(){document.querySelectorAll('.fsBtn').forEach(b=>b.textContent=fsEl()?'Exit fullscreen':'Enter fullscreen')}
+function onFSChange(){syncFS();window.__fsLast=fsEl()?'on':'off';setTimeout(()=>{try{onResize()}catch(e){window.dispatchEvent(new Event('resize'))}
+ // re-acquire pointer lock in a match (Chrome drops it on fullscreen change); if the browser refuses, the pause screen's click-to-resume handles it
+ if(G&&fsEl()&&FS_RELOCK&&typeof lockPointer==='function'){try{lockPointer()}catch(e){}}FS_RELOCK=false},60)}
+document.addEventListener('fullscreenchange',onFSChange);document.addEventListener('webkitfullscreenchange',onFSChange);
+KB_ACTIONS.push(['fullscreen','Toggle fullscreen (Alt+Enter always works)','']);KBM=kbMap();
+addEventListener('keydown',e=>{const alt=e.altKey&&(e.code==='Enter'||e.code==='NumpadEnter');const kb=KBM.fullscreen&&e.code===KBM.fullscreen&&!(typeof CHAT!=='undefined'&&CHAT.open)&&!(document.activeElement&&/INPUT|TEXTAREA/.test(document.activeElement.tagName));
+ if(alt||kb){e.preventDefault();e.stopImmediatePropagation();toggleFS()}},true);
+document.querySelectorAll('.fsBtn').forEach(b=>b.onclick=e=>{e.stopPropagation();toggleFS()});syncFS();
+document.querySelectorAll('.mmIn').forEach(i=>{i.checked=settings.minimap!==false;i.onchange=()=>{settings.minimap=i.checked;saveSettings();document.querySelectorAll('.mmIn').forEach(j=>j.checked=i.checked)}});
+
+// ---- minimap: teammates always; enemies only blip where they fired (2.5s fade). Static layer cached per map.
+const MINI={sz:176,map:null,cv:null,lastFire:{}};
+const _heV7=handleEvent;handleEvent=function(e){try{if(G&&(e.t==='fx'||e.t==='tr')&&e.s>=0&&G.P[e.s]){const p=G.P[e.s];MINI.lastFire[e.s]={t:performance.now(),pos:p.pos.slice()}}}catch(x){}return _heV7(e)};
+function miniStatic(){const k=G.mapIdx+'|'+G.boxes.filter(b=>!b.dyn).length;if(MINI.map===k)return MINI.cv;MINI.map=k;
+ let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;for(const b of G.boxes){if(b.dyn)continue;if(b.max[1]-b.min[1]<.25&&b.min[1]<.05&&(b.max[0]-b.min[0])>40)continue;x0=Math.min(x0,b.min[0]);x1=Math.max(x1,b.max[0]);z0=Math.min(z0,b.min[2]);z1=Math.max(z1,b.max[2])}
+ const span=Math.max(x1-x0,z1-z0)+4,S=MINI.sz*2,c=document.createElement('canvas');c.width=c.height=S;const x=c.getContext('2d');MINI.b={cx:(x0+x1)/2,cz:(z0+z1)/2,span};
+ x.fillStyle='rgba(12,18,28,.82)';x.fillRect(0,0,S,S);const tp=(wx,wz)=>[(wx-MINI.b.cx)/span*S+S/2,(wz-MINI.b.cz)/span*S+S/2];
+ const bs=G.boxes.filter(b=>!b.dyn).sort((a,b)=>a.max[1]-b.max[1]);
+ for(const b of bs){const h=b.max[1];if(h<.3)continue;const [ax,az]=tp(b.min[0],b.min[2]),[bx,bz]=tp(b.max[0],b.max[2]);const l=Math.min(200,70+h*22)|0;x.fillStyle=h>2.4?`rgb(${l*.55|0},${l*.62|0},${l*.75|0})`:`rgba(${l*.5|0},${l*.6|0},${l*.7|0},.75)`;x.fillRect(ax,az,Math.max(1,bx-ax),Math.max(1,bz-az))}
+ x.strokeStyle='rgba(120,170,220,.5)';x.lineWidth=3;x.strokeRect(1.5,1.5,S-3,S-3);MINI.cv=c;MINI.tp=tp;return c}
+// v7: player-centred rotating minimap - you are the fixed arrow pointing up, the map turns with your view and scrolls with you.
+// Circular mask, fixed 30m radius, teammates always (clamped to the rim when off-edge), enemies only as fading blips when they fire.
+const MINI_R=20;
+function miniDraw(){const el=$('#minimap');if(!el)return;const show=G&&settings.minimap!==false&&!$('#hud').classList.contains('hide')&&G.rs!=='mapvote'&&G.rs!=='nextmap';el.style.display=show?'':'none';if(!show)return;
+ const S=MINI.sz,x=el.getContext('2d'),st=miniStatic(),me=G.P[ME]||G.P[0],now=performance.now();const C=S/2,RAD=C-3,k=RAD/MINI_R;
+ const d=dirYP(me.yaw,0),rot=-Math.atan2(d[2],d[0])-Math.PI/2,cr=Math.cos(rot),sr=Math.sin(rot);
+ const w2s=(wx,wz)=>{const dx=(wx-me.pos[0])*k,dz=(wz-me.pos[2])*k;return [C+dx*cr-dz*sr,C+dx*sr+dz*cr]};
+ const clampR=(p,m)=>{const vx=p[0]-C,vy=p[1]-C,l=Math.hypot(vx,vy);if(l<=RAD-m)return [p,false];return [[C+vx/l*(RAD-m),C+vy/l*(RAD-m)],true]};
+ x.clearRect(0,0,S,S);x.save();x.beginPath();x.arc(C,C,RAD,0,7);x.clip();x.fillStyle='rgba(8,12,20,.85)';x.fillRect(0,0,S,S);
+ const sppm=st.width/MINI.b.span,q=MINI.tp(me.pos[0],me.pos[2]);x.translate(C,C);x.rotate(rot);x.scale(k/sppm,k/sppm);x.translate(-q[0],-q[1]);x.drawImage(st,0,0);x.restore();
+ x.save();x.beginPath();x.arc(C,C,RAD,0,7);x.clip();
+ const arrow=(px,pz,ang,col,big)=>{x.save();x.translate(px,pz);x.rotate(ang);x.fillStyle=col;x.strokeStyle='#000';x.lineWidth=1;x.beginPath();const r=big?7:5;x.moveTo(0,-r-2);x.lineTo(r*.75,r);x.lineTo(0,r*.45);x.lineTo(-r*.75,r);x.closePath();x.fill();x.stroke();x.restore()};
+ for(const p of G.P){if(p.off||!p.alive||p.team!==me.team||p.id===me.id)continue;const [pp,edge]=clampR(w2s(p.pos[0],p.pos[2]),6);const pd=dirYP(p.yaw,0);const a=Math.atan2(pd[2],pd[0])+rot+Math.PI/2;
+  if(edge){x.globalAlpha=.85}arrow(pp[0],pp[1],a,p.team?'#ff9b3d':'#5aa8ff');x.globalAlpha=1}
+ for(const id in MINI.lastFire){const f=MINI.lastFire[id],p=G.P[id];const age=(now-f.t)/1000;if(age>2||!p||p.team===me.team){if(age>2)delete MINI.lastFire[id];continue}const [pp]=clampR(w2s(f.pos[0],f.pos[2]),5);const al=1-age/2;
+  x.fillStyle=`rgba(255,60,60,${al})`;x.beginPath();x.arc(pp[0],pp[1],4.5,0,7);x.fill();x.strokeStyle=`rgba(255,120,120,${al*.8})`;x.lineWidth=1.5;x.beginPath();x.arc(pp[0],pp[1],4.5+age*7,0,7);x.stroke()}
+ x.restore();
+ x.strokeStyle='rgba(120,170,220,.75)';x.lineWidth=2.5;x.beginPath();x.arc(C,C,RAD,0,7);x.stroke();
+ const n=w2s(me.pos[0],me.pos[2]-1000);const nv=[n[0]-C,n[1]-C],nl=Math.hypot(...nv);x.fillStyle='#cde';x.font='bold 11px sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText('N',C+nv[0]/nl*(RAD-9),C+nv[1]/nl*(RAD-9));
+ arrow(C,C,0,'#ffffff',1)}
+setInterval(()=>{try{miniDraw()}catch(e){}},50);
+
+// ---- back to lobby during the next-map vote. Practice: back to the menu. Online host: everyone returns to the lobby
+// (same room code, same connections). Online client: asks the host; a majority of humans (or the host) sends everyone back.
+function lobbyFromGame(){const sl=[null,null,null,null];for(const p of G.P){if(p.off)sl[p.id]={off:true};else if(!p.bot&&p.id===ME)sl[p.id]={name:myName(),human:true,conn:null,tok:NETTOK};else if(!p.bot&&p.conn&&p.conn.open)sl[p.id]={name:p.name,human:true,conn:p.conn,link:p.conn.link||(FAKENET?'Test':''),tok:p.tok||''}}
+ for(const p of G.P)if(p.conn)p.conn.slot=p.id;return sl}
+function leaveGameKeepNet(){const keep={peer,hostConn,LOBBY};peer=null;hostConn=null;const sv=cleanupNet;cleanupNet=function(){};try{quitToMenu('')}finally{cleanupNet=sv}peer=keep.peer;hostConn=keep.hostConn;LOBBY=keep.LOBBY;started=false}
+function hostBackToLobby(){if(!G||!HOST)return;if(!LOBBY){quitToMenu('');return}const sl=lobbyFromGame();LOBBY.slots=sl;LOBBY.me=ME;LOBBY.qp=false;LOBBY.backReq={};
+ for(const s of sl)if(s&&s.conn)netSend(s.conn,{t:'tolobby'});leaveGameKeepNet();showLobby();broadcastLobby();lobbyMsg('Back in the lobby. Press Start when ready.')}
+function clientToLobby(){leaveGameKeepNet();LOBBY.qp=false;showLobby();renderLobby();lobbyMsg('Back in the lobby - waiting for the host to start...')}
+function backToLobbyClick(){if(!G)return;if(!LOBBY){quitToMenu('');return}if(HOST){hostBackToLobby();return}netSend(hostConn,{t:'backreq'});G.backReq=1;MVUI.k=null}
+function hostBackReq(pid){if(!G||!HOST||G.rs!=='mapvote'&&G.rs!=='nextmap')return;LOBBY.backReq=LOBBY.backReq||{};LOBBY.backReq[pid]=1;const hs=humans();const n=hs.filter(p=>LOBBY.backReq[p.id]).length;
+ G.backN=n;if(n>hs.length/2)hostBackToLobby()}
+{const _hm=hostMsg;hostMsg=function(c,d){if(d&&d.t==='backreq'){c.lastHeard=performance.now();if(c.slot!==undefined)hostBackReq(c.slot);return}return _hm(c,d)};
+ const _cm=clientMsg;clientMsg=function(d,to){if(d&&d.t==='tolobby'){clientToLobby();return}return _cm(d,to)}}
+{const _mv=mapVoteHUD;mapVoteHUD=function(){_mv();const el=$('#mvote');if(!el||el.classList.contains('hide'))return;let b=$('#bBackLobby');if(!b){b=document.createElement('button');b.id='bBackLobby';b.className='backlobby';b.onclick=e=>{e.stopPropagation();backToLobbyClick()};el.appendChild(b)}
+ b.textContent=!LOBBY?'Back to Menu':HOST?'Back to Lobby (everyone)':G.backReq?'Back to Lobby - requested':'Back to Lobby (vote)';b.disabled=!!G.backReq&&!HOST}}
+
+// ---- loadout vote v2: stat bars vs. the whole arsenal, leader highlight, voter chips, timer bar
+const VSTAT=(()=>{let m={dmg:1,rpm:1,rng:1,mob:1,pen:1};for(const k in W){const w=W[k];m.dmg=Math.max(m.dmg,w.dm[1]);m.rpm=Math.max(m.rpm,w.rpm||0);m.rng=Math.max(m.rng,w.r1||0);m.pen=Math.max(m.pen,w.pen||0)}return m})();
+function vbar(lbl,v,max,txt){const f=Math.max(.04,Math.min(1,v/max));return `<div class="vbr"><span>${lbl}</span><i><b style="width:${(f*100).toFixed(0)}%"></b></i><em>${txt}</em></div>`}
+function voteCard(lo,i){const a=W[lo[0]],b=W[lo[1]],u=UT[lo[2]];makeIcons();const im=id=>ICON[id]?`<img class="simg" src="${ICON[id]}">`:'';
+ return `<button class="vc v2" data-i="${i}"><div class="vk">${keyName(kc('vote'+(i+1)))}</div><div class="vlead">LEADING</div><div class="vp">${a.n}</div><div class="vcls">${a.cls} &middot; ${a.mag} rds &middot; ${a.sight}</div>${ICON[lo[0]]?`<img class="vimg" src="${ICON[lo[0]]}">`:''}
+ <div class="vbars">${vbar('DMG',a.dm[1],VSTAT.dmg,`${Math.round(a.dm[0])}/${Math.round(a.dm[1])}/${Math.round(a.dm[2])}`)}${vbar('RATE',a.rpm||0,VSTAT.rpm,(a.rpm||0)+' rpm')}${vbar('RANGE',a.r1||0,VSTAT.rng,(a.r1||0)+' m')}${vbar('MOBILITY',a.spd||1,1.05,Math.round((a.spd||1)*100)+'%')}${vbar('PEN',a.pen||0,VSTAT.pen,penCm(a)+' cm')}</div>
+ <div class="vsec">${im(lo[1])}<div><b>${b.n}</b><span>${b.cls} &middot; ${b.dm.map(Math.round).join('/')} &middot; PEN ${penCm(b)}</span></div></div><div class="vsec">${im(lo[2])}<div><b>${u.n}</b> <span class="utag l">LETHAL</span><span>${u.d}</span></div></div>${lo[3]&&UT[lo[3]]?`<div class="vsec">${im(lo[3])}<div><b>${UT[lo[3]].n}</b> <span class="utag t">TACTICAL</span><span>${UT[lo[3]].d}</span></div></div>`:''}<div class="vcnt" id="vc${i}"></div></button>`}
+setInterval(()=>{try{if(!G||G.rs!=='vote'){const t=$('#vtBar');if(t)t.remove();return}const vt=$('#vote');if(vt.classList.contains('hide'))return;let t=$('#vtBar');if(!t){t=document.createElement('div');t.id='vtBar';t.innerHTML='<b></b>';vt.insertBefore(t,vt.children[1]||null)}
+ const tot=typeof VOTE_TIME!=='undefined'?VOTE_TIME:10;t.firstChild.style.width=Math.max(0,Math.min(100,G.rt/tot*100))+'%';const c=[0,0,0];for(const p of G.P){const v=(G.votes||[])[p.id];if(v>=0&&!p.bot)c[v]++}const mx=Math.max(...c);
+ vt.querySelectorAll('.vc').forEach(b=>{const i=+b.dataset.i;b.classList.toggle('lead',mx>0&&c[i]===mx);const el=$('#vc'+i);if(el){const vs=(G.votes||[]).map((v,j)=>v===i?j:-1).filter(j=>j>=0);el.innerHTML=vs.map(j=>`<span class="vchip" style="border-color:${G.P[j].team?'#ff9b3d':'#5aa8ff'}">${esc(G.P[j].name)}</span>`).join('')||'<span class="vnone">no votes</span>'}})}catch(e){}},120);
+
+// ---- crate icons: one procedural illustration per crate theme
+const CRICON={};
+function crateIcon(c,w,h){w=w||150;h=h||112;const k=c.id+w;if(CRICON[k])return CRICON[k];const cv=document.createElement('canvas');cv.width=w;cv.height=h;const x=cv.getContext('2d');const col=c.col||'#8ab';
+ let s=0;for(const ch of c.id)s=(s*31+ch.charCodeAt(0))>>>0;const R=()=>(s=(s*1664525+1013904223)>>>0)/4294967296;
+ const cx=w/2,top=h*.2,bw=w*.62,bh=h*.42,d=h*.16;const g=x.createRadialGradient(cx,h*.55,4,cx,h*.55,w*.6);g.addColorStop(0,col+'66');g.addColorStop(1,'transparent');x.fillStyle=g;x.fillRect(0,0,w,h);
+ const L=cx-bw/2,T=top+d+h*.06;// front face
+ const fg=x.createLinearGradient(0,T,0,T+bh);fg.addColorStop(0,col);fg.addColorStop(1,'#111');x.fillStyle=fg;x.fillRect(L,T,bw,bh);
+ x.fillStyle=col+'cc';x.beginPath();x.moveTo(L,T);x.lineTo(L+d,T-d);x.lineTo(L+bw+d,T-d);x.lineTo(L+bw,T);x.closePath();x.fill();// lid top
+ x.fillStyle='#0008';x.beginPath();x.moveTo(L+bw,T);x.lineTo(L+bw+d,T-d);x.lineTo(L+bw+d,T+bh-d);x.lineTo(L+bw,T+bh);x.closePath();x.fill();// side
+ x.save();x.beginPath();x.rect(L,T,bw,bh);x.clip();x.lineWidth=2;
+ if(c.id==='ember'||/volcan|fire/i.test(c.theme)){x.strokeStyle='#ffd27a';for(let i=0;i<5;i++){x.beginPath();let px=L+R()*bw,py=T;x.moveTo(px,py);while(py<T+bh){px+=(R()-.5)*14;py+=6+R()*8;x.lineTo(px,py)}x.stroke()}x.fillStyle='#ff6a1a55';x.fillRect(L,T+bh*.7,bw,bh*.3)}
+ else if(c.id==='tide'||/ocean|water/i.test(c.theme)){x.strokeStyle='#bff4ff';for(let r=0;r<4;r++){x.beginPath();for(let i=0;i<=bw;i+=3)x.lineTo(L+i,T+bh*(.25+r*.2)+Math.sin(i*.18+r)*3.5);x.stroke()}}
+ else if(c.id==='circuit'||/neon|tech/i.test(c.theme)){x.strokeStyle='#9dffd8';x.fillStyle='#9dffd8';for(let i=0;i<7;i++){let px=L+R()*bw,py=T+R()*bh;x.beginPath();x.moveTo(px,py);for(let j=0;j<3;j++){if(R()<.5)px+=(R()-.5)*30;else py+=(R()-.5)*20;x.lineTo(px,py)}x.stroke();x.beginPath();x.arc(px,py,2.5,0,7);x.fill()}}
+ else if(c.kind==='char'){/*v8: character crate = helmeted bust silhouette*/const bx=cx,by=T+bh*.62;x.fillStyle='#e9eef5';x.globalAlpha=.85;x.beginPath();x.ellipse(bx,by+bh*.42,bw*.3,bh*.28,0,Math.PI,0);x.fill();x.beginPath();x.arc(bx,by-bh*.08,bh*.2,0,7);x.fill();x.fillStyle=col;x.beginPath();x.arc(bx,by-bh*.12,bh*.22,Math.PI,0);x.fill();x.fillRect(bx-bh*.24,by-bh*.13,bh*.48,bh*.05);x.fillStyle='#111';x.fillRect(bx-bh*.12,by-bh*.06,bh*.24,bh*.06);x.globalAlpha=1}
+ else if(c.kind==='emote'||c.kind==='emo'){/*v8: emote crate = dancing figure + music notes*/x.strokeStyle='#f4f0ff';x.fillStyle='#f4f0ff';x.lineWidth=3;x.lineCap='round';const fx=cx-bw*.12,fy=T+bh*.28;x.beginPath();x.arc(fx,fy,bh*.09,0,7);x.fill();x.beginPath();x.moveTo(fx,fy+bh*.1);x.lineTo(fx+3,fy+bh*.42);x.moveTo(fx,fy+bh*.18);x.lineTo(fx-bw*.13,fy+bh*.02);x.moveTo(fx,fy+bh*.18);x.lineTo(fx+bw*.12,fy+bh*.3);x.moveTo(fx+3,fy+bh*.42);x.lineTo(fx-bw*.08,fy+bh*.68);x.moveTo(fx+3,fy+bh*.42);x.lineTo(fx+bw*.1,fy+bh*.62);x.stroke();
+  const note=(nx,ny,sz)=>{x.beginPath();x.ellipse(nx,ny,sz*.55,sz*.4,-.4,0,7);x.fill();x.fillRect(nx+sz*.4,ny-sz*1.8,2.5,sz*1.8);x.fillRect(nx+sz*.4,ny-sz*1.8,sz*.8,2.5)};note(cx+bw*.22,T+bh*.42,bh*.13);note(cx+bw*.34,T+bh*.7,bh*.1);x.lineWidth=2}
+ else{x.strokeStyle='#fff6';for(let i=0;i<6;i++){x.beginPath();x.moveTo(L+i*bw/5,T);x.lineTo(L+i*bw/5-bh*.5,T+bh);x.stroke()}}
+ x.restore();x.strokeStyle='#000a';x.lineWidth=2;x.strokeRect(L,T,bw,bh);// lid seam + lock
+ x.fillStyle='#0009';x.fillRect(L,T+bh*.18,bw,3);x.fillStyle='#e9e2c8';x.fillRect(cx-7,T+bh*.12,14,16);x.fillStyle='#333';x.fillRect(cx-2,T+bh*.12+6,4,6);
+ x.font=`bold ${Math.round(h*.11)}px system-ui`;x.textAlign='center';x.fillStyle='#fff';x.shadowColor='#000';x.shadowBlur=4;x.fillText((c.n||c.id).replace(/ Crate$/,'').toUpperCase(),cx,h-6);
+ return CRICON[k]=cv.toDataURL('image/png')}
+{const _cp=cratesPage;cratesPage=function(){_cp();document.querySelectorAll('#crateGrid .crate').forEach((el,i)=>{const c=CRATES[i];const b=el.querySelector('.cbox');if(c&&b){b.innerHTML=`<img class="cimg" alt="${esc(c.n)}" src="${crateIcon(c)}">`;b.classList.add('hasimg')}})}}
+{const _sp=skinsPage;skinsPage=function(){_sp();document.querySelectorAll('#skinFilter .pt').forEach(b=>{const c=CRATES.find(q=>q.id===b.dataset.f);if(c&&!b.querySelector('img'))b.insertAdjacentHTML('afterbegin',`<img class="fimg" src="${crateIcon(c,40,30)}">`)});
+ document.querySelectorAll('#skinGrid .scard').forEach(c=>c.onclick=()=>openSkinViewer(c.dataset.s))}}
+
+// ---- skin viewer: separate modal, drag to rotate, wheel / pinch-buttons to zoom, equip from inside
+const SKV={r:null,sc:null,cam:null,obj:null,yaw:-.6,pitch:.18,zoom:1,raf:0,drag:null,id:null,idle:0};
+function openSkinViewer(id){const s=SKIN[id];if(!s)return;SKV.id=id;PREVIEW=id;const box=$('#skv');box.classList.remove('hide');
+ if(!SKV.r){try{SKV.r=new THREE.WebGLRenderer({canvas:$('#skvCv'),antialias:true,alpha:true})}catch(e){$('#skvInfo').textContent='3D preview unavailable';return}SKV.r.setPixelRatio(Math.min(2,devicePixelRatio||1));if(THREE.sRGBEncoding)SKV.r.outputEncoding=THREE.sRGBEncoding;SKV.r.toneMapping=THREE.ACESFilmicToneMapping;SKV.r.toneMappingExposure=1;
+  SKV.sc=new THREE.Scene();SKV.sc.add(new THREE.HemisphereLight(0xdfe8ff,0x3a3f4a,.9));const k=new THREE.DirectionalLight(0xffffff,1.1);k.position.set(3,4,2);SKV.sc.add(k);const r=new THREE.DirectionalLight(0x8fb8ff,.6);r.position.set(-3,1,-2);SKV.sc.add(r);
+  SKV.cam=new THREE.PerspectiveCamera(32,1,.01,50);const cv=$('#skvCv');
+  cv.onpointerdown=e=>{SKV.drag=[e.clientX,e.clientY];SKV.idle=0;cv.setPointerCapture(e.pointerId)};cv.onpointerup=()=>SKV.drag=null;
+  cv.onpointermove=e=>{if(!SKV.drag)return;SKV.yaw+=(e.clientX-SKV.drag[0])*.01;SKV.pitch=Math.max(-1.2,Math.min(1.2,SKV.pitch+(e.clientY-SKV.drag[1])*.01));SKV.drag=[e.clientX,e.clientY];SKV.idle=0};
+  cv.onwheel=e=>{e.preventDefault();SKV.zoom=Math.max(.45,Math.min(2.6,SKV.zoom*(e.deltaY>0?1.1:.9)));SKV.idle=0};
+  $('#skvIn').onclick=()=>{SKV.zoom=Math.max(.45,SKV.zoom*.85)};$('#skvOut').onclick=()=>{SKV.zoom=Math.min(2.6,SKV.zoom*1.18)};$('#skvReset').onclick=()=>{SKV.yaw=-.6;SKV.pitch=.18;SKV.zoom=1};
+  $('#skvClose').onclick=closeSkinViewer;box.onclick=e=>{if(e.target===box)closeSkinViewer()};document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!box.classList.contains('hide'))closeSkinViewer()})}
+ if(SKV.obj){SKV.sc.remove(SKV.obj)}const g=buildGun(s.gun,1,id);const bb=new THREE.Box3().setFromObject(g),c=bb.getCenter(new THREE.Vector3()),sz=bb.getSize(new THREE.Vector3());g.position.sub(c);const piv=new THREE.Group();piv.add(g);SKV.obj=piv;SKV.rad=Math.max(sz.x,sz.y,sz.z);SKV.sc.add(piv);
+ SKV.yaw=-.6;SKV.pitch=.18;SKV.zoom=1;const own=!!ACC.owned[id],eq=ACC.equipped[s.gun]===id;
+ $('#skvInfo').innerHTML=`<div class="skvn">${esc6(s.n)}</div><div><span style="color:${RAR[s.rar].c};font-weight:bold">${RAR[s.rar].n}</span> &middot; ${esc6(W[s.gun].n)} &middot; ${CRATES.find(c=>c.id===s.crate).n}</div><div class="sub">Drag to rotate &middot; scroll to zoom</div>`;
+ const eb=$('#skvEquip');eb.disabled=!own;eb.textContent=!own?'Locked - open its crate':eq?'Unequip':'Equip';eb.onclick=async()=>{const r=await ACC.equip(s.gun,ACC.equipped[s.gun]===id?'':id);if(r&&r.error)menuMsg(r.error);skinsPage();openSkinViewer(id)};
+ cancelAnimationFrame(SKV.raf);const loop=()=>{if($('#skv').classList.contains('hide'))return;const cv=$('#skvCv'),W2=cv.clientWidth,H2=cv.clientHeight;if(cv.width!==W2*SKV.r.getPixelRatio()|0)SKV.r.setSize(W2,H2,false);SKV.cam.aspect=W2/H2;SKV.cam.updateProjectionMatrix();
+  SKV.idle+=1/60;if(!SKV.drag&&SKV.idle>2)SKV.yaw+=.006;SKV.obj.rotation.set(SKV.pitch,SKV.yaw,0,'XYZ');const dist=SKV.rad*1.9*SKV.zoom;SKV.cam.position.set(0,0,dist);SKV.cam.lookAt(0,0,0);SKV.r.render(SKV.sc,SKV.cam);SKV.raf=requestAnimationFrame(loop)};loop()}
+function closeSkinViewer(){$('#skv').classList.add('hide');cancelAnimationFrame(SKV.raf)}
+
+// v7: Marbleway fruit - host tests every shot ray against live fruit, emits {t:'fruit',i}; every peer bursts it (also late joiners via 'fruitset')
+function fruitShot(o,d,maxT){for(let i=0;i<FRUIT.length;i++){const f=FRUIT[i];if(f.dead)continue;const ox=o[0]-f.p[0],oy=o[1]-f.p[1],oz=o[2]-f.p[2];const b=ox*d[0]+oy*d[1]+oz*d[2],c=ox*ox+oy*oy+oz*oz-f.r*f.r,disc=b*b-c;if(disc<0)continue;const t=-b-Math.sqrt(disc);if(t>=0&&t<=maxT+.05){f.dead=1;emit({t:'fruit',i})}}}
+function fruitBurst(i){const f=FRUIT[i];if(!f)return;const was=f.m.visible;f.dead=1;f.m.visible=false;if(was&&PN)for(let k=0;k<14;k++)PN.emit(f.p,[rnd(-1.6,1.6),rnd(.5,2.6),rnd(-1.6,1.6)],k%3?f.c:0xfff0c0,.07+Math.random()*.06,.7,9,1,0);if(was&&typeof SND!=='undefined'&&SND.clink)try{SND.clink(f.p)}catch(e){}}
+{const _he=handleEvent;handleEvent=function(e){if(e&&e.t==='fruit'){fruitBurst(e.i);return}if(e&&e.t==='fruitset'){FRUIT.forEach((f,i)=>{if(e.d.includes(i))fruitBurst(i)});return}return _he.apply(this,arguments)}}
+window.__fruit=()=>FRUIT.map(f=>f.dead);
+
+// ---- v8: fullscreen by default. Browsers only allow fullscreen inside a user gesture, so it is requested on the first click / key press
+// of the session unless Settings > Display > "Start in fullscreen" is off. If the player leaves fullscreen we don't force it back.
+document.querySelectorAll('.fsDefIn').forEach(i=>{i.checked=settings.startFS!==false;i.onchange=()=>{settings.startFS=i.checked;saveSettings();document.querySelectorAll('.fsDefIn').forEach(j=>j.checked=i.checked)}});
+{let done=false;const go=e=>{if(done)return;done=true;removeEventListener('pointerdown',go,true);removeEventListener('keydown',go,true);
+  if(settings.startFS===false||fsEl()||window.__noAutoFS)return;if(e&&e.target&&e.target.closest&&e.target.closest('.fsBtn,.fsDefIn'))return;window.__autoFS=1;toggleFS()};
+ addEventListener('pointerdown',go,true);addEventListener('keydown',go,true)}

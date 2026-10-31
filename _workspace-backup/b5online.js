@@ -1,0 +1,10 @@
+require('./testguard');const {launch,open,sleep}=require('./b3lib');(async()=>{const br=await launch();const errs=[],R={};const h=await open(br,errs,'');await sleep(3000);
+R.inMenu=await h.evaluate(()=>!!document.querySelector('#menu #onlineCount'));
+await h.evaluate(async()=>{window.__ONLINE_EXTRA=46;await __onlineTick()});await sleep(300);
+R.shown=await h.evaluate(()=>{const e=document.getElementById('onlineCount');return [getComputedStyle(e).display,e.textContent,ACC.status]});
+R.calls=await h.evaluate(()=>window.__SBCALLS.filter(c=>/heartbeat|online/.test(c)).length);
+await h.screenshot({path:'progress/v7-online-count.png'});
+await h.evaluate(async()=>{ACC._st=ACC.status;ACC.status='offline';await __onlineTick()});R.offline=await h.evaluate(()=>getComputedStyle(document.getElementById('onlineCount')).display);
+await h.evaluate(async()=>{ACC.status=ACC._st;const o=ACC.sb.rpc;ACC.sb.rpc=async()=>({data:null,error:{message:'Could not find the function'}});await __onlineTick();R2=getComputedStyle(document.getElementById('onlineCount')).display;ACC.sb.rpc=o;window.__R2=R2});
+R.rpcError=await h.evaluate(()=>window.__R2);
+console.log(JSON.stringify(R));console.log('ERRS',JSON.stringify(errs));await br.close()})();

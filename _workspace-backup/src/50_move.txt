@@ -1,0 +1,70 @@
+const BHOP_WIN=.14,BHOP_GAIN=1.06,BHOP_CAP=11.2;
+// ===================== MOVEMENT (AABB) =====================
+function overlap(p,b,h){return p.pos[0]+.35>b.min[0]&&p.pos[0]-.35<b.max[0]&&p.pos[2]+.35>b.min[2]&&p.pos[2]-.35<b.max[2]&&p.pos[1]+h>b.min[1]&&p.pos[1]<b.max[1]}
+// v8 WATER: liquid boxes used to be full 3m solid colliders under a water sheet drawn at 0.18m -> you could stand ON the water
+// (and hit an invisible wall). Shallow liquid (<1m box) is just wading (g9z_b4). A deep liquid box is now a pool: no collision, the floor inside it is POOL_D below ground, you wade
+// slowly (no sprint/slide), gravity is softer, jump is a swim stroke, and walking out of the edge steps you back up onto ground.
+const POOL_D=.55;/*v8 drop1b: Tyler - no swimming. Pools are wadeable: floor .55 below ground + surface at .18 = ~.73m (knee-to-waist), normal gravity, ~0.8x speed via wadeMul, sprint/slide allowed, step-up over the rim.*/
+function liqAt(x,z){if(!G)return null;for(const b of G.boxes)if(b.liquid&&b.max[1]-b.min[1]>=1&&x>b.min[0]&&x<b.max[0]&&z>b.min[2]&&z<b.max[2])return b;return null}
+function inPool(p){return !!liqAt(p.pos[0],p.pos[2])&&p.pos[1]<.2}
+function movePlayer(p,inp,dt){
+ if(p.off)return;
+ const w=curW(p);
+ if(inp.crouch!==undefined){if(!inp.crouch&&p.crouch){p.crouch=false;for(const b of G.boxes)if(!b.liquid&&overlap(p,b,1.8)){p.crouch=true;break}}else if(inp.crouch)p.crouch=true}
+ // v6 stamina: sprint drains, tactical sprint (double-tap) drains fast and is time-limited, jump costs a little
+ if(p.stam===undefined)p.stam=100;if(!(p.slideT>-9))p.slideT=0;if(!(p.slideCd>=0))p.slideCd=0;if(!(p.tacT>=0))p.tacT=0;
+ p.slideCd=Math.max(0,p.slideCd-dt);
+ const mvIn=(inp.f||0)!==0||(inp.r||0)!==0;let sprint=inp.sprint&&mvIn&&!p.ads&&p.stam>2&&(!p.crouch||p.slideT>0);
+ let tac=sprint&&inp.tac&&p.tacT<2.2&&p.stam>8;p.tac=tac;p.tacT=tac?p.tacT+dt:(sprint?p.tacT:Math.max(0,p.tacT-dt*.6));
+ // slide = crouch pressed while sprinting on the ground
+ if(inp.crouch&&!p.wasCr&&p.ground&&p.moving&&inp.sprint&&p.slideT<=0&&p.slideCd<=0&&p.stam>=15&&!p.mant){p.slideT=.75;p.slideCd=1.1;p.stam-=15;const hv=Math.hypot(p.vel[0],p.vel[2]);let f=dirYP(p.yaw,0);{const fi=inp.f||0,ri=inp.r||0;if(fi||ri){const sy_=Math.sin(p.yaw),cy_=Math.cos(p.yaw);let ax=-sy_*fi+cy_*ri,az=-cy_*fi-sy_*ri;const l_=Math.hypot(ax,az);f=[ax/l_,0,az/l_]}else if(hv>1)f=[p.vel[0]/hv,0,p.vel[2]/hv]}const sp=Math.max(9.5,hv*1.35);p.vel[0]=f[0]*sp;p.vel[2]=f[2]*sp;p.slideDir=[f[0],f[2]];if(typeof onSlide==='function')onSlide(p)}
+ p.wasCr=!!inp.crouch;
+ if(p.slideT>0){p.slideT-=dt;p.crouch=true;sprint=false;tac=false;if(!p.ground||Math.hypot(p.vel[0],p.vel[2])<2.5)p.slideT=Math.min(p.slideT,0)}
+ if(sprint)p.stam=Math.max(0,p.stam-dt*(tac?26:11));else p.stam=Math.min(100,p.stam+dt*(p.moving?16:24));
+ p.swim=false;p.wading=inPool(p);
+ p.sprinting=sprint;p.tac=tac;
+ const spd=(typeof wadeMul==="function"?wadeMul(p):1)*5.2*w.spd*(sprint?(tac?1.72:1.45)*((inp.f||0)<0?.88:1):1)*(p.crouch?.55:1)*(p.ads?.65:1);
+ let fx=inp.f||0,rx=inp.r||0;const l=Math.hypot(fx,rx);if(l>1){fx/=l;rx/=l}
+ const sy=Math.sin(p.yaw),cy=Math.cos(p.yaw);
+ const tx=(-sy*fx+cy*rx)*spd,tz=(-cy*fx-sy*rx)*spd;
+ if(p.grap){p.grap.t-=dt;const g=p.grap.pt;const d=[g[0]-p.pos[0],g[1]-1.1-p.pos[1],g[2]-p.pos[2]];const L=Math.hypot(...d);
+  if(L<2.6&&tryMantle(p,inp,[d[0],0,d[2]])){p.grap=null;p.grapMant=(p.grapMant||0)+1;p.moving=true;return}
+  if(L<1.4||p.grap.t<=0||(inp.jump&&p.grap.t<1.1)){p.grap=null;if(tryMantle(p,inp,[d[0],0,d[2]])){p.grapMant=(p.grapMant||0)+1;p.moving=true;return}}else{const s=Math.min(19,6+L*2);p.vel=[d[0]/L*s,d[1]/L*s+1.2,d[2]/L*s];p.ground=false}}
+ if(p.mant){mantleStep(p,dt);p.moving=true;return}
+ if(!(p.landT>=0))p.landT=0;p.landT=Math.max(0,p.landT-dt);
+ if(!p.grap){const bh=p.ground&&p.landT>0&&inp.jump&&!p.ads;const hs0=Math.hypot(p.vel[0],p.vel[2]);const k=bh?0:p.slideT>0?Math.min(1,dt*1.6):Math.min(1,dt*(p.ground?12:(Math.hypot(p.vel[0],p.vel[2])>Math.hypot(tx,tz)?.6:2.5)));const ttx=p.slideT>0?0:tx,ttz=p.slideT>0?0:tz;p.vel[0]+=(ttx-p.vel[0])*k;p.vel[2]+=(ttz-p.vel[2])*k;
+  if(inp.jump&&!p.ground&&tryMantle(p,inp))return;
+  if(inp.jump&&p.ground){if(tryMantle(p,inp))return;p.vel[1]=p.stam>5?7:6;p.ground=false;p.stam=Math.max(0,p.stam-6);p.slideT=Math.min(p.slideT,0);
+   if(bh&&hs0>3){const cap=BHOP_CAP*w.spd,ns=Math.min(cap,hs0*BHOP_GAIN);const tl=Math.hypot(tx,tz);let dx=p.vel[0]/hs0,dz=p.vel[2]/hs0;if(tl>.1){dx=dx*.7+tx/tl*.3;dz=dz*.7+tz/tl*.3;const l2=Math.hypot(dx,dz);dx/=l2;dz/=l2}p.vel[0]=dx*ns;p.vel[2]=dz*ns;p.bhops=(p.bhops||0)+1}else p.bhops=0}
+  else if((p.bot||inp.autoMantle)&&inp.f>0&&!p.ground&&p.vel[1]<1.5&&tryMantle(p,inp))return;/*v8 drop 2: players mantle actively with Space (prompt shown); bots keep auto-mantle*/
+  p.vel[1]-=20*dt}
+ const h=pH(p);
+ for(const a of [0,2]){p.pos[a]+=p.vel[a]*dt;for(const b of G.boxes){if(b.liquid||!overlap(p,b,h))continue;const top=b.max[1]-p.pos[1];
+   if(top>0&&top<=(p.pos[1]<-.05?POOL_D+.65:.5)&&(!b.wall||p.pos[1]<-.05&&top<=POOL_D+.65)&&!b.liquid){const oy=p.pos[1];p.pos[1]=b.max[1];let ok=true;for(const c of G.boxes)if(!c.liquid&&overlap(p,c,h)){ok=false;break}if(ok)continue;p.pos[1]=oy}
+   if(p.vel[a]>0)p.pos[a]=b.min[a]-.3501;else p.pos[a]=b.max[a]+.3501;p.vel[a]=0;if(p.grap){const gd=[p.grap.pt[0]-p.pos[0],0,p.grap.pt[2]-p.pos[2]];p.grap=null;if(tryMantle(p,inp,gd)){p.grapMant=(p.grapMant||0)+1;p.moving=true;return}}}}
+ p.pos[1]+=p.vel[1]*dt;p.ground=false;
+ const wasAir=p._air;for(const b of G.boxes){if(b.liquid||!overlap(p,b,h))continue;if(p.vel[1]<=0){p.pos[1]=b.max[1];p.ground=true}else p.pos[1]=b.min[1]-h-.001;p.vel[1]=0}
+ {const lq=liqAt(p.pos[0],p.pos[2]);const fl=lq?-POOL_D:0;if(!lq&&p.pos[1]<0&&p.pos[1]>-POOL_D-.05){p.pos[1]=0;p.vel[1]=Math.max(0,p.vel[1])}/*step out of a pool edge*/
+  if(p.pos[1]<=fl){p.pos[1]=fl;p.vel[1]=0;p.ground=true}}
+ if(p.ground&&wasAir)p.landT=BHOP_WIN;p._air=!p.ground;
+ // jump pads (Springbok Pad): launch anyone who steps on one
+ if(p.ground&&G.pads)for(const pd of G.pads){if(Math.hypot(p.pos[0]-pd.pos[0],p.pos[2]-pd.pos[2])<.9&&Math.abs(p.pos[1]-pd.pos[1])<.45){const f=dirYP(p.yaw,0);p.vel[1]=PAD_UP;p.vel[0]+=f[0]*5;p.vel[2]+=f[2]*5;p.ground=false;if(p.id===ME&&typeof SND!=='undefined')SND.pad();break}}
+ p.pos[0]=Math.max(-MX+.36,Math.min(MX-.36,p.pos[0]));p.pos[2]=Math.max(-MZ+.36,Math.min(MZ-.36,p.pos[2]));
+ p.moving=Math.hypot(p.vel[0],p.vel[2])>1;
+}
+// v6 MANTLING: when jumping or pushing forward (airborne) into a ledge/crate/low wall whose top is <=1.6m above the feet and has
+// standing room on top, play a short vault: rise first, then move forward onto the top. Deterministic so client prediction and host agree.
+function mantleProbe(p,dir){let f=dirYP(p.yaw,0);if(dir){const l=Math.hypot(dir[0],dir[2]);if(l>.05)f=[dir[0]/l,0,dir[2]/l]}const h=pH(p);let best=null;const maxH=dir?2.2:1.6;
+ for(const b of G.boxes){if(b.liquid||b.dyn)continue;const top=b.max[1]-p.pos[1];if(top<(dir?.1:.45)||top>maxH)continue;
+  let reach=-1;for(const rr of dir?[.55,.9,1.3]:[.55]){const fx=p.pos[0]+f[0]*rr,fz=p.pos[2]+f[2]*rr;if(!(fx+.2<b.min[0]||fx-.2>b.max[0]||fz+.2<b.min[2]||fz-.2>b.max[2])){reach=rr;break}}if(reach<0)continue;
+  if(b.wall&&b.max[1]>=4)continue;
+  const tx=p.pos[0]+f[0]*(reach+.4),tz=p.pos[2]+f[2]*(reach+.4);const q={pos:[tx,b.max[1]+.02,tz]};let ok=true;
+  for(const c of G.boxes)if(!c.liquid&&overlap(q,c,1.0)){ok=false;break}
+  const up={pos:[p.pos[0],b.max[1]+.02,p.pos[2]]};if(ok)for(const c of G.boxes)if(c!==b&&overlap(up,c,.9)){ok=false;break}
+  if(ok&&(!best||b.max[1]<best.y))best={y:b.max[1]+.02,to:[tx,tz]}}
+ return best}
+function tryMantle(p,inp,dir){if(p.mant||p.slideT>0||!G)return false;const m=mantleProbe(p,dir);if(!m)return false;
+ const ht=m.y-p.pos[1];p.mant={t:0,T:.28+ht*.16,y0:p.pos[1],y1:m.y,x0:p.pos[0],z0:p.pos[2],x1:m.to[0],z1:m.to[1]};p.vel=[0,0,0];p.crouch=false;if(typeof onMantle==='function')onMantle(p);return true}
+function mantleStep(p,dt){const m=p.mant;m.t+=dt;const u=Math.min(1,m.t/m.T);const a=Math.min(1,u/.6),b=Math.max(0,(u-.45)/.55);
+ p.pos[1]=m.y0+(m.y1-m.y0)*(1-Math.pow(1-a,2));const e=b*b*(3-2*b);p.pos[0]=m.x0+(m.x1-m.x0)*e;p.pos[2]=m.z0+(m.z1-m.z0)*e;
+ if(u>=1){p.mant=null;p.ground=true;p.vel=[0,0,0]}}

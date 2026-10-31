@@ -1,0 +1,65 @@
+// ===================== v6 MUSIC: procedural WebAudio score (no samples, no vocals) =====================
+// Menu theme "Night Shift": A-minor dark synthwave, 100 BPM, 8-bar seamless loop.
+// Persistent pad/bass/lead oscillators are reused; notes are scheduled ~0.35 s ahead on a 100 ms timer.
+const MUS={bus:null,mix:null,on:false,scene:'off',next:0,step:0,timer:null,v:{},
+ vol(){return settings.musMute?0:(settings.musVol===undefined?.5:+settings.musVol)},
+ init(){const a=ac();if(!a||MUS.bus)return a;MUS.bus=a.createGain();MUS.bus.gain.value=0;MUS.bus.connect(a.destination);
+  // scene mix (menu full, lobby filtered/no drums)
+  MUS.lp=a.createBiquadFilter();MUS.lp.type='lowpass';MUS.lp.frequency.value=18000;MUS.lp.connect(MUS.bus);
+  const mk=(type,f,det,g)=>{const o=a.createOscillator();o.type=type;o.frequency.value=f;o.detune.value=det||0;const gg=a.createGain();gg.gain.value=g||0;o.connect(gg);o.start();return {o,g:gg}};
+  // pad: 3 voices x 2 detuned saws -> lowpass with slow LFO
+  const pf=a.createBiquadFilter();pf.type='lowpass';pf.frequency.value=900;pf.Q.value=2;const pg=a.createGain();pg.gain.value=.0;pf.connect(pg);pg.connect(MUS.lp);
+  const lfo=a.createOscillator();lfo.frequency.value=.11;const lg=a.createGain();lg.gain.value=500;lfo.connect(lg);lg.connect(pf.frequency);lfo.start();
+  MUS.v.pad=[0,1,2].map(()=>[mk('sawtooth',220,-9,.07),mk('sawtooth',220,9,.07)]);MUS.v.pad.forEach(p=>p.forEach(x=>x.g.connect(pf)));MUS.v.padG=pg;
+  // bass: saw through resonant lowpass, gated per 8th
+  const bf=a.createBiquadFilter();bf.type='lowpass';bf.frequency.value=420;bf.Q.value=6;const bo=mk('sawtooth',55,0,1);const bs=mk('square',55,-1200,.4);const bg=a.createGain();bg.gain.value=0;bo.g.connect(bf);bs.g.connect(bf);bf.connect(bg);bg.connect(MUS.lp);MUS.v.bass={o:[bo.o,bs.o],g:bg,f:bf};
+  // lead: triangle+square blend with vibrato and feedback echo
+  const lo=mk('triangle',440,0,.6),ls=mk('square',440,4,.12);const lgn=a.createGain();lgn.gain.value=0;lo.g.connect(lgn);ls.g.connect(lgn);
+  const vib=a.createOscillator();vib.frequency.value=5.2;const vg=a.createGain();vg.gain.value=6;vib.connect(vg);vg.connect(lo.o.detune);vg.connect(ls.o.detune);vib.start();
+  const dl=a.createDelay(1);dl.delayTime.value=60/100*.75;const fb=a.createGain();fb.gain.value=.32;const dwet=a.createGain();dwet.gain.value=.35;lgn.connect(dl);dl.connect(fb);fb.connect(dl);dl.connect(dwet);dwet.connect(MUS.lp);lgn.connect(MUS.lp);
+  MUS.v.lead={o:[lo.o,ls.o],g:lgn};
+  // drums bus (muted in lobby)
+  MUS.dr=a.createGain();MUS.dr.gain.value=1;MUS.dr.connect(MUS.lp);
+  const b=a.createBuffer(1,a.sampleRate*.5,a.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;MUS.nb=b;
+  return a},
+ hz(n){return 440*Math.pow(2,(n-69)/12)},
+ // A minor: Am | F | C | G | Am | F | Dm | E
+ CH:[[57,60,64],[53,57,60],[48,52,55],[55,59,62],[57,60,64],[53,57,60],[50,53,57],[52,56,59]],
+ BASS:[45,41,36,43,45,41,38,40],
+ // lead motif (bars 4-7 of the loop): [step16 within 2 bars, midi, len in 16ths]
+ MOTIF:[[0,76,3],[3,74,1],[4,72,2],[6,69,2],[8,72,4],[12,71,2],[14,67,2],[16,69,3],[19,72,1],[20,76,2],[22,79,2],[24,77,6],[30,76,2]],
+ tick(){const a=AC;if(!a||!MUS.on)return;const spb=60/100/4;while(MUS.next<a.currentTime+.35){MUS.sched(MUS.step,MUS.next,spb);MUS.step=(MUS.step+1)%128;MUS.next+=spb}},
+ sched(st,t,spb){const bar=st>>4,s=st&15,v=MUS.v;
+  if(s===0){const ch=MUS.CH[bar];v.pad.forEach((p,i)=>p.forEach(x=>x.o.frequency.setTargetAtTime(MUS.hz(ch[i]),t,.08)));v.padG.gain.setTargetAtTime(bar===7?.5:.42,t,.4);
+   v.bass.o.forEach(o=>o.frequency.setValueAtTime(MUS.hz(MUS.BASS[bar]),t))}
+  // pulsing bass on 8ths with accent
+  if(s%2===0){const g=v.bass.g.gain;g.setValueAtTime(0,t);g.linearRampToValueAtTime(s%4===0?.34:.22,t+.01);g.setTargetAtTime(0,t+.05,.07);v.bass.f.frequency.setValueAtTime(s%4===0?700:450,t);v.bass.f.frequency.setTargetAtTime(260,t+.01,.08)}
+  // drums: kick 1/3, clap 2/4 (bar>=2), hats 8ths, open hat off-beat end of bar
+  if(s===0||s===8||(s===14&&bar%2))MUS.kick(t);if((s===4||s===12)&&bar>=2)MUS.nz(t,.16,'bandpass',1800,1.4,.28);if(s%2===0)MUS.nz(t,.03,'highpass',8000,.8,s%4===2?.1:.05);if(s===15&&bar===7)MUS.nz(t,.3,'highpass',6000,.6,.08);
+  // lead motif bars 4-7
+  if(bar>=4){const ls=(bar-4)*16+s;for(const [k,n,len] of MUS.MOTIF)if(k===ls%32){const vary=(bar>=6&&k>=24)?n-5:n;MUS.note(t,vary,len*spb)}}},
+ note(t,n,len){const v=MUS.v.lead;v.o.forEach(o=>o.frequency.setValueAtTime(MUS.hz(n),t));const g=v.g.gain;g.setValueAtTime(0,t);g.linearRampToValueAtTime(.16,t+.015);g.setTargetAtTime(.1,t+.05,.1);g.setTargetAtTime(0,t+len*.9,.05)},
+ kick(t){const a=AC;const o=a.createOscillator(),g=a.createGain();o.frequency.setValueAtTime(130,t);o.frequency.exponentialRampToValueAtTime(42,t+.12);g.gain.setValueAtTime(.55,t);g.gain.exponentialRampToValueAtTime(.001,t+.3);o.connect(g);g.connect(MUS.dr);o.start(t);o.stop(t+.32)},
+ nz(t,dur,type,f,q,vol,dst){const a=AC;const s=a.createBufferSource();s.buffer=MUS.nb;const fl=a.createBiquadFilter();fl.type=type;fl.frequency.value=f;fl.Q.value=q;const g=a.createGain();g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.001,t+dur);s.connect(fl);fl.connect(g);g.connect(dst||MUS.dr);s.start(t);s.stop(t+dur+.02)},
+ // scenes: 'menu' (full), 'lobby' (filtered, no drums), 'game' (silent loop)
+ setScene(sc){MUS.scene=sc;const a=MUS.init();if(!a)return;const t=a.currentTime,V=MUS.vol();
+  if(sc==='menu'||sc==='lobby'){if(!MUS.on){MUS.on=true;MUS.next=t+.1;MUS.step=0;MUS.timer=setInterval(MUS.tick,100)}
+   MUS.bus.gain.cancelScheduledValues(t);MUS.bus.gain.setTargetAtTime(V*.55,t,.6);MUS.lp.frequency.setTargetAtTime(sc==='lobby'?1100:18000,t,.8);MUS.dr.gain.setTargetAtTime(sc==='lobby'?0:1,t,.5)}
+  else{MUS.bus.gain.cancelScheduledValues(t);MUS.bus.gain.setTargetAtTime(0,t,.5);setTimeout(()=>{if(MUS.scene==='game'||MUS.scene==='off'){MUS.on=false;clearInterval(MUS.timer);MUS.timer=null}},2500)}},
+ applyVol(){if(!MUS.bus||!AC)return;const t=AC.currentTime;MUS.bus.gain.setTargetAtTime((MUS.scene==='menu'||MUS.scene==='lobby')?MUS.vol()*.55:0,t,.1)},
+ // one-shot stings go through their own gain so they work while the loop is stopped
+ stOut(){const a=MUS.init();if(!a||a.state!=='running')return null;const g=a.createGain();g.gain.value=MUS.vol()*.8;g.connect(a.destination);return g},
+ osc(dst,type,f,t0,dur,v,f1){const a=AC,o=a.createOscillator(),g=a.createGain();o.type=type;o.frequency.setValueAtTime(f,t0);if(f1)o.frequency.exponentialRampToValueAtTime(f1,t0+dur);g.gain.setValueAtTime(0,t0);g.gain.linearRampToValueAtTime(v,t0+.02);g.gain.exponentialRampToValueAtTime(.001,t0+dur);o.connect(g);g.connect(dst);o.start(t0);o.stop(t0+dur+.05)},
+ // round-start sting (~6.5 s): low drone, accelerating war-drum hits, rising noise sweep, final minor stab
+ roundSting(){const d=MUS.stOut();if(!d)return;const a=AC,t=a.currentTime+.05;MUS.lastSting='round';
+  const dr=a.createOscillator(),dg=a.createGain(),df=a.createBiquadFilter();dr.type='sawtooth';dr.frequency.value=55;df.type='lowpass';df.frequency.setValueAtTime(150,t);df.frequency.exponentialRampToValueAtTime(1400,t+5.8);dg.gain.setValueAtTime(0,t);dg.gain.linearRampToValueAtTime(.22,t+1.5);dg.gain.setValueAtTime(.22,t+5.8);dg.gain.exponentialRampToValueAtTime(.001,t+6.6);dr.connect(df);df.connect(dg);dg.connect(d);dr.start(t);dr.stop(t+6.7);
+  let tt=t,gap=.75;while(tt<t+5.6){MUS.osc(d,'sine',110,tt,.35,.5,40);MUS.nz(tt,.12,'lowpass',400,1,.25,d);tt+=gap;gap=Math.max(.12,gap*.86)}
+  const s=a.createBufferSource();s.buffer=MUS.nb;s.loop=true;const sf=a.createBiquadFilter();sf.type='bandpass';sf.Q.value=3;sf.frequency.setValueAtTime(300,t+2);sf.frequency.exponentialRampToValueAtTime(6000,t+5.8);const sg=a.createGain();sg.gain.setValueAtTime(0,t+2);sg.gain.linearRampToValueAtTime(.12,t+5.8);sg.gain.linearRampToValueAtTime(0,t+5.95);s.connect(sf);sf.connect(sg);sg.connect(d);s.start(t+2);s.stop(t+6);
+  for(const n of [45,57,60,64,69])MUS.osc(d,'sawtooth',MUS.hz(n),t+5.9,.9,.09);MUS.osc(d,'sine',55,t+5.9,.8,.5,30)},
+ endSting(win){const d=MUS.stOut();if(!d)return;const t=AC.currentTime+.05;MUS.lastSting=win?'win':'lose';
+  const seq=win?[[69,0],[72,.12],[76,.24],[81,.36],[84,.6]]:[[69,0],[68,.22],[65,.44],[64,.66],[57,.9]];
+  for(const [n,dt] of seq){MUS.osc(d,'triangle',MUS.hz(n),t+dt,win?.7:1,.2);MUS.osc(d,'sawtooth',MUS.hz(n-12),t+dt,.5,.05)}
+  const ch=win?[57,61,64,69]:[57,60,63,69];for(const n of ch)MUS.osc(d,'sawtooth',MUS.hz(n),t+(win?.6:.9),1.6,.05)}
+};
+// start after the first user gesture (autoplay policy)
+addEventListener('pointerdown',function f(){removeEventListener('pointerdown',f,true);setTimeout(()=>{if(!G&&MUS.scene==='off')MUS.setScene(document.getElementById('lobby')&&!document.getElementById('lobby').classList.contains('hide')?'lobby':'menu')},50)},true);

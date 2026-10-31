@@ -1,0 +1,141 @@
+// ===================== NETWORKING =====================
+// FakePeer: same-origin BroadcastChannel stand-in used ONLY for automated testing (?fakenet)
+class FakeConn{constructor(pe,r){this.pe=pe;this.peer=r;this.h={};this.open=false}on(e,f){this.h[e]=f}emit(e,d){this.h[e]&&this.h[e](d)}send(d){this.pe.bc.postMessage({from:this.pe.id,to:this.peer,k:'data',d:JSON.parse(JSON.stringify(d))})}close(){if(!this.open)return;this.open=false;this.pe.bc.postMessage({from:this.pe.id,to:this.peer,k:'close'});delete this.pe.cs[this.peer];setTimeout(()=>this.emit('close'),0)}}
+class FakePeer{constructor(id){this.id=id||'fp-'+Math.random().toString(36).slice(2);this.h={};this.cs={};this.bc=new BroadcastChannel('twofold-fake');this.bc.onmessage=e=>this._m(e.data);setTimeout(()=>this.emit('open',this.id),20)}
+ on(e,f){this.h[e]=f}emit(e,d){this.h[e]&&this.h[e](d)}
+ connect(r){const c=new FakeConn(this,r);this.cs[r]=c;this.bc.postMessage({from:this.id,to:r,k:'conn'});return c}
+ _m(m){if(m.to!==this.id)return;let c=this.cs[m.from];
+  if(m.k==='conn'){c=new FakeConn(this,m.from);this.cs[m.from]=c;this.emit('connection',c);setTimeout(()=>{c.open=true;c.emit('open');this.bc.postMessage({from:this.id,to:m.from,k:'ack'})},10)}
+  else if(m.k==='ack'&&c){c.open=true;c.emit('open')}else if(m.k==='data'&&c)c.emit('data',m.d);else if(m.k==='close'&&c){c.open=false;c.emit('close');delete this.cs[m.from]}}
+ destroy(){for(const k in this.cs)this.cs[k].close();const bc=this.bc;setTimeout(()=>bc.close(),50)}}
+function mkPeer(id,ice){if(FAKENET)return new FakePeer(id);ice=ice||ICE;return id?new Peer(id,{config:ice,debug:0}):new Peer({config:ice,debug:0})}
+function netSend(c,m){try{if(c&&c.open)c.send(m)}catch(e){}}
+const NETTOK=(()=>{try{let t=sessionStorage.getItem('tf_tok');if(!t){t=Math.random().toString(36).slice(2,12);sessionStorage.setItem('tf_tok',t)}return t}catch(e){return Math.random().toString(36).slice(2,12)}})();
+let LOBBYSEQ=0,REJ=null,LAST_ICE=null;
+function lobbyMsg(t){$('#lobbyMsg').textContent=t}
+async function hostOnline(fixed){
+ let ice=ICE,iceErr='';try{ice=await getIce()}catch(e){iceErr=' (Relay setup failed: '+e.message+' - direct only)'}
+ cleanupNet();const code=fixed||genCode();LOBBY={code,qp:!!fixed,host:true,slots:[{name:myName(),human:true,conn:null,tok:NETTOK},null,null,null],me:0,map:-1,ff:false,seq:++LOBBYSEQ};freshLobbyChat();
+ showLobby();renderLobby();lobbyMsg('Registering room code...');
+ peer=mkPeer(PFX+code,ice);
+ peer.on('open',()=>{lobbyMsg('Share the code with friends, then press Start.'+(relayOn()&&!iceErr?' Relay fallback: ON.':'')+iceErr)});
+ peer.on('error',e=>{if(e.type==='unavailable-id'){if(fixed){MM.requeue('Room clash - searching again...');return}hostOnline()}else lobbyMsg('Network error: '+e.type)});
+ peer.on('disconnected',()=>{try{if(peer&&!peer.destroyed)peer.reconnect()}catch(e){}});
+ peer.on('connection',c=>{c.lastHeard=performance.now();c.on('data',d=>hostMsg(c,d));c.on('open',()=>probeLink(c));c.on('close',()=>hostDrop(c));c.on('error',()=>hostDrop(c))});
+}
+function probeLink(c,n=0){if(FAKENET)return;setTimeout(async()=>{const t=await linkType(c.peerConnection);c.link=t;if(t==='?'&&n<5)return probeLink(c,n+1);if(LOBBY&&LOBBY.host&&!started&&c.slot!==undefined&&LOBBY.slots[c.slot]&&LOBBY.slots[c.slot].conn===c){LOBBY.slots[c.slot].link=t;broadcastLobby()}},1000+n*1000)}
+function freeSlot(team){for(const i of team?[2,3]:[0,1])if(!LOBBY.slots[i]||LOBBY.slots[i].off)return i;return -1}
+function hostMsg(c,d){
+ if(!d||typeof d!=='object')return;c.lastHeard=performance.now();
+ if(d.t==='hb')return;
+ if(d.t==='hello'){if(started){hostLateJoin(c,d);return}
+  const cnt=t=>LOBBY.slots.filter((s,i)=>s&&s.human&&(i<2?0:1)===t).length;let s=freeSlot(cnt(0)<=cnt(1)?0:1);if(s<0)s=freeSlot(0);if(s<0)s=freeSlot(1);
+  if(s<0){netSend(c,{t:'full',why:'Room is full (4/4 players). Try again when someone leaves.'});return}
+  let nm=String(d.name||'Friend').slice(0,16);{const taken=n=>LOBBY.slots.some((x,j)=>x&&j!==s&&String(x.name).toLowerCase()===n.toLowerCase());let k=2;const b=nm.slice(0,14);while(taken(nm)&&k<20)nm=b+(k++)}LOBBY.slots[s]={name:nm,human:true,conn:c,link:c.link||(FAKENET?'Test':''),tok:typeof d.tok==='string'?d.tok.slice(0,16):'',pk:typeof d.pk==='string'?d.pk.slice(0,40):''};c.slot=s;broadcastLobby();return}
+ if(d.t==='switch'&&!started){const s=c.slot;if(s===undefined)return;const n=freeSlot(s<2?1:0);if(n>=0){LOBBY.slots[n]=LOBBY.slots[s];LOBBY.slots[s]=null;c.slot=n;broadcastLobby()}else netSend(c,{t:'note',m:'That team already has 2 players.'});return}
+ if(d.t==='chat'){if(c.slot!==undefined&&(!G||G.P[c.slot]&&!G.P[c.slot].bot))hostChat(c.slot,d.m,d.tm);return}
+ if(!G||c.slot===undefined)return;const p=G.P[c.slot];if(!p||p.bot)return;
+ if(d.t==='st'){p.relF=!!d.rel;
+  // spawn fix: ignore stale states from the previous round (wrong spawn serial) and impossible teleports
+  if(d.ss!==G.ss||G.rs==='pre'||G.rs==='vote'||!p.alive||!Array.isArray(d.pos)||d.pos.some(v=>!isFinite(v)))return;
+  if(dist3(d.pos,p.pos)>6){p.badSt=(p.badSt||0)+1;return}p.badSt=0;p.pos=d.pos;p.yaw=d.yaw;p.pitch=d.pitch;p.crouch=!!d.crouch;p.cur=d.cur?1:0;if(W[d.w])p.inv[p.cur].w=d.w;p.ads=!!d.ads&&!W[p.inv[p.cur].w].noAds;p.heldC=[0,1,2,3].includes(d.hd)?d.hd:p.cur;p.skinCur=typeof d.sk==='string'&&d.sk.length<24?d.sk:'';p.inspF=!!d.ins;p.slideF=!!d.sl;p.mantF=!!d.mt}
+ else if(d.t==='shot'||d.t==='nade'||d.t==='util'||d.t==='melee')hostAction(c.slot,d);
+ else if(d.t==='mvote')hostMapVote(c.slot,d.i);
+ else if(d.t==='take')hostTakeover(c.slot,d.i|0);
+ else if(d.t==='vote')hostVote(c.slot,d.i);
+}
+function hostLateJoin(c,d){
+ if(!G){netSend(c,{t:'full',why:'Room is full.'});return}
+ if(typeof d.tok==='string'&&d.tok){const q=G.P.find(p=>p.tok===d.tok&&!p.off);if(q){const old=q.conn;if(old&&old!==c){old.dropped=true;try{old.close()}catch(e){}}
+  q.bot=false;q.off=false;q.conn=c;q.pendConn=null;q.bot_=null;q.name=q.name.replace(/ \(bot\)$/,'');c.slot=q.id;c.lastHeard=performance.now();
+  netSend(c,{t:'start',map:G.mapIdx,slots:G.P.map(p=>({name:p.name,bot:p.bot,off:p.off})),you:q.id,late:1,rejoin:1,ff:G.ff,tod:G.tod});emit({t:'joined',n:q.name+' (reconnected)'});return}}
+ const cnt=t=>G.P.filter(p=>p.team===t&&p.bot&&!p.pendConn).length;
+ const t=cnt(0)>=cnt(1)?0:1;let p=G.P.find(q=>q.team===t&&q.bot&&!q.pendConn)||G.P.find(q=>q.bot&&!q.pendConn)||G.P.find(q=>q.off&&!q.pendConn);
+ if(!p){netSend(c,{t:'full',why:'Room is full (4/4 players). Try again when someone leaves.'});return}
+ let name=String(d.name||'Friend').slice(0,16);{const taken=n=>G.P.some(q=>q!==p&&!q.bot&&String(q.name).toLowerCase()===n.toLowerCase())||G.P.some(q=>q!==p&&q.pendConn&&String(q.pendName).toLowerCase()===n.toLowerCase());let k=2;const b=name.slice(0,14);while(taken(name)&&k<20)name=b+(k++)}p.pendConn=c;p.pendName=name;p.pendTok=typeof d.tok==='string'?d.tok.slice(0,16):'';c.slot=p.id;
+ netSend(c,{t:'start',map:G.mapIdx,slots:G.P.map(q=>({name:q.name,bot:q.bot,off:q.off})),you:p.id,late:1,ff:G.ff,tod:G.tod});
+ emit({t:'joined',n:name});
+ if(G.rs==='pre')promotePending();
+}
+function promotePending(){for(const p of G.P){if(p.pendConn){if(p.pendConn.open&&!p.pendConn.dropped){p.bot=false;p.off=false;p.conn=p.pendConn;p.name=p.pendName;p.tok=p.pendTok||'';p.bot_=null}p.pendConn=null}}}
+function hostDrop(c){if(c.dropped)return;c.dropped=true;const s=c.slot;if(s===undefined||!LOBBY)return;
+ if(!started){if(LOBBY.slots[s]&&LOBBY.slots[s].conn===c){LOBBY.slots[s]=null;broadcastLobby()}return}
+ if(G){const p=G.P[s];if(p.pendConn===c){p.pendConn=null;return}if(!p.bot&&p.conn===c){p.bot=true;p.conn=null;p.bot_=null;emit({t:'left',n:p.name});p.name=p.name+' (bot)'}}}
+function lobbyWire(){return LOBBY.slots.map(x=>x?(x.off?{off:1}:{name:x.name,link:x.link||'',human:1,pk:x.conn?(x.pk||''):DEVPK}):null)}
+function broadcastLobby(){renderLobby();LOBBY.slots.forEach((s,i)=>{if(s&&s.conn)netSend(s.conn,{t:'lobby',slots:lobbyWire(),you:i,code:LOBBY.code,map:LOBBY.map,ff:LOBBY.ff?1:0})})}
+async function joinOnline(code){
+ code=String(code||'').toUpperCase().trim();if(!/^[A-HJ-NP-Z]{5}$/.test(code)){$('#menuMsg').textContent='Enter the 5-letter room code';return}
+ const M=t=>$('#menuMsg').textContent=t;let ice=ICE,iceErr='';M('Connecting...');try{ice=await getIce()}catch(e){iceErr='Relay setup failed: '+e.message+'. '}
+ cleanupNet();LOBBY={code,qp:!!(typeof MM!=='undefined'&&MM.st==='joining'),host:false,slots:[null,null,null,null],me:-1,seq:++LOBBYSEQ};freshLobbyChat();LAST_ICE=ice;M(iceErr+'Connecting...');let opened=false;const R=relayOn()&&!iceErr;
+ const to1=setTimeout(()=>{if(LOBBY&&LOBBY.me<0&&!started&&!opened)M(iceErr+(R?"Couldn't reach host directly, trying relay...":"Couldn't reach host directly. Still trying... (no relay server set up)"))},10000);
+ const to=setTimeout(()=>{clearTimeout(to1);if(LOBBY&&LOBBY.me<0&&!started){M(opened?'Connected but the host did not answer. Ask them to re-host.':R?'Could not connect even through the relay. Check that the host and you both saved the same relay settings, and that the code is right.':'Could not connect. A strict NAT/firewall is likely blocking a direct link - set up a free Relay server (button below) on both your and the host\'s game, then try again.');cleanupNet()}},R?30000:20000);
+ peer=mkPeer(null,ice);
+ peer.on('open',()=>{const hc=peer.connect(PFX+code,{reliable:true,serialization:'json'});hostConn=hc;
+  hc.on('open',()=>{opened=true;clearTimeout(to1);lastHeard=performance.now();netSend(hc,{t:'hello',name:myName(),tok:NETTOK})});
+  hc.on('data',d=>{lastHeard=performance.now();clientMsg(d,to)});
+  hc.on('close',()=>{if(hostConn===hc){hostConn=null;if(started&&G)clientReconnect('closed');else if(LOBBY&&LOBBY.qp)MM.requeue('The host left - searching again...');else quitToMenu('The host left the match.')}})});
+ peer.on('disconnected',()=>{try{if(peer&&!peer.destroyed)peer.reconnect()}catch(e){}});
+ peer.on('error',e=>{$('#menuMsg').textContent=e.type==='peer-unavailable'?'No room with that code.':'Network error: '+e.type;clearTimeout(to);clearTimeout(to1)});
+}
+function clientMsg(d,to){
+ if(d.t==='lobby'){clearTimeout(to);LOBBY.slots=d.slots;try{devQueue(d.slots.map(s=>s&&s.pk))}catch(e){}LOBBY.me=d.you;LOBBY.map=d.map;LOBBY.ff=!!d.ff;showLobby();renderLobby()}
+ else if(d.t==='chat'){chatShow(d)}
+ else if(d.t==='note'){lobbyMsg(d.m)}
+ else if(d.t==='full'){$('#menuMsg').textContent=d.why;cleanupNet()}
+ else if(d.t==='hb'){}
+ else if(d.t==='start'){if(d.rejoin&&G&&G.mapIdx===d.map){REJ=null;ME=d.you|0;lastHeard=performance.now();netNote('Reconnected.');return}REJ=null;startGame({map:d.map,slots:d.slots,me:d.you,host:false,ff:d.ff,tod:d.tod})}
+ else if(d.t==='snap'){lastHeard=performance.now();applySnap(d)}
+ else if(d.t==='you'&&G){ME=d.me|0;onBecome()}
+}
+function freshLobbyChat(){const lc=$('#lchat');if(lc)lc.innerHTML='';CHATLOG.length=0;window.__lobbySeq=LOBBYSEQ}
+function showLobby(){if(typeof MUS!=='undefined'&&MUS.scene!=='off')MUS.setScene('lobby');$('#menu').classList.add('hide');$('#lobby').classList.remove('hide');$('#codeTxt').textContent=LOBBY.code;$('#bStart').style.display=LOBBY.host?'':'none';if(!LOBBY.host)lobbyMsg(LOBBY.qp?'Quick Play - the host starts automatically...':'Waiting for the host to start...');$('#codeBox').style.display=LOBBY.qp?'none':'';$('#lqp').classList.toggle('hide',!LOBBY.qp);if(LOBBY.qp){$('#bStart').style.display='none';$('#lset').style.display='none'}else $('#lset').style.display=''}
+function renderLobby(){const H=LOBBY.host;for(const t of [0,1]){$('#lt'+t).innerHTML=(t?[2,3]:[0,1]).map(i=>{const s=LOBBY.slots[i];const human=s&&!s.off;
+  const body=human?esc(s.name)+devB(s.name)+(i===LOBBY.me?' (you)':'')+(s.link?` <span style="font-size:12px;color:${s.link==='Relay'?'#fb6':'#7d7'}">${s.link}</span>`:''):s&&s.off?'<span style="color:#567">Empty</span>':'<span style="color:#9ab">Bot</span>';
+  const btn=!human&&H?` <button class="sm slotT" data-i="${i}">${s&&s.off?'+ Add bot':'- Remove bot'}</button>`:'';return `<div class="slot ${i===LOBBY.me?'you':''}">${body}${btn}</div>`}).join('')}
+ document.querySelectorAll('.slotT').forEach(b=>b.onclick=()=>{const i=+b.dataset.i;LOBBY.slots[i]=LOBBY.slots[i]&&LOBBY.slots[i].off?null:{off:true};broadcastLobby()});
+ const ms=$('#lMap');if(ms.options.length!==MAPS.length+1)ms.innerHTML='<option value="-1">Random map</option>'+MAPS.map((m,i)=>`<option value="${i}">${m.n} - ${m.era}</option>`).join('');
+ ms.value=String(LOBBY.map>=0?LOBBY.map:-1);ms.disabled=!H;$('#lFF').checked=!!LOBBY.ff;$('#lFF').disabled=!H;
+ $('#lMapTxt').textContent=H?'':'(host picks)';$('#lFFTxt').textContent=LOBBY.ff?'ON':'OFF';
+ const n=LOBBY.slots.filter(s=>!s||!s.off).length;const tc=t=>LOBBY.slots.filter((s,i)=>(i<2?0:1)===t&&(!s||!s.off)).length;{const me=LOBBY.me,ot=me<2?1:0,free=me>=0&&(ot?[2,3]:[0,1]).some(i=>!LOBBY.slots[i]||LOBBY.slots[i].off),b=$('#bSwitch');if(b){b.style.display=free?'':'none';b.textContent='Switch to '+(ot?'ORANGE':'BLUE')}}
+ $('#bStart').disabled=H&&(tc(0)<1||tc(1)<1);if(H&&(tc(0)<1||tc(1)<1))lobbyMsg('Each team needs at least one player or bot.');}
+function hostStartMatch(){if(!LOBBY||!LOBBY.host)return;let map=LOBBY.qp?-1:LOBBY.map;if(!(map>=0))map=Math.floor(Math.random()*MAPS.length);
+ const BN=typeof pickBotNames==='function'?pickBotNames(4):['Bot Ash','Bot Vex','Bot Rook','Bot Moss'];const slots=LOBBY.slots.map((s,i)=>s&&s.off?{name:'(empty)',bot:true,off:true}:s?{name:s.name,bot:false,conn:s.conn}:{name:BN[i],bot:true});
+ const ff=!!LOBBY.ff,wire=slots.map(s=>({name:s.name,bot:s.bot,off:!!s.off}));
+ const tod=rollTod(map);const now=performance.now();LOBBY.slots.forEach((s,i)=>{if(s&&s.conn){s.conn.lastHeard=now;netSend(s.conn,{t:'start',map,slots:wire,you:i,ff,tod})}});
+ startGame({map,slots,me:LOBBY.me,host:true,ff,tod});
+ if(G)LOBBY.slots.forEach((s,i)=>{if(s&&!s.off&&G.P[i])G.P[i].tok=s.tok||''});
+}
+function cleanupNet(){if(NETHB.rt){clearTimeout(NETHB.rt);NETHB.rt=0}const h=hostConn;hostConn=null;try{if(h)h.close()}catch(e){}try{if(peer)peer.destroy()}catch(e){}peer=null}
+function quitToMenu(msg){
+ try{MM.reset()}catch(e){}
+ if(typeof MUS!=='undefined'&&MUS.scene!=='off')MUS.setScene('menu'); voiceStop();REJ=null;cleanupNet();G=null;try{freshLobbyChat()}catch(e){}CHAT.open=false;$('#chatBox').classList.add('hide');started=false;LOBBY=null;HOST=false;window.__G=null;wasLocked=false;
+ try{document.exitPointerLock()}catch(e){}
+ for(const m of pMeshes)scene.remove(m);pMeshes=[];if(mapGroup){scene.remove(mapGroup);mapGroup=null}for(const k in nadeMeshes)scene.remove(nadeMeshes[k]);for(const k in smokeMeshes)scene.remove(smokeMeshes[k]);nadeMeshes={};smokeMeshes={};for(const k in dynMeshes)scene.remove(dynMeshes[k]);dynMeshes={};for(const k in itemMeshes)scene.remove(itemMeshes[k]);for(const r of ROPES)scene.remove(r.m);ROPES=[];if(vm){camera.remove(vm);if(vm.userData.knife)camera.remove(vm.userData.knife);vm=null;vmId=null}
+ for(const t of tracers)scene.remove(t.m);tracers=[];for(const b of booms)scene.remove(b.m);booms=[];
+ scene.background=new THREE.Color(0x0a0b10);scene.fog=null;
+ ['#hud','#pause','#lobby','#pracSetup'].forEach(s=>$(s).classList.add('hide'));$('#menu').classList.remove('hide');$('#menuMsg').textContent=msg||'';
+}
+
+
+// ---- v7 netcode: timer-driven heartbeats (work in background tabs, during map load and in the lobby) + client auto-rejoin
+const NETHB={rt:0,timeout:15000};
+function netNote(m){try{if(G&&typeof banner==='function')banner(m,3);else lobbyMsg(m)}catch(e){}window.__netNote=m}
+setInterval(()=>{const now=performance.now();
+ if(LOBBY&&LOBBY.host){const cs=new Set();LOBBY.slots.forEach(s=>{if(s&&s.conn)cs.add(s.conn)});if(G)for(const p of G.P){if(p.conn)cs.add(p.conn);if(p.pendConn)cs.add(p.pendConn)}for(const c of cs)netSend(c,{t:'hb'})}
+ else if(hostConn)netSend(hostConn,{t:'hb'});
+ if(LOBBY&&!LOBBY.host&&!started&&hostConn&&lastHeard&&now-lastHeard>NETHB.timeout)quitToMenu('Lost connection to the host.');
+},1000);
+function clientReconnect(why){if(!LOBBY||LOBBY.host||!G)return;if(REJ&&REJ.busy)return;
+ REJ=REJ||{n:0,code:LOBBY.code,t0:performance.now()};REJ.busy=true;REJ.n++;window.__rejoins=(window.__rejoins||0)+1;
+ if(REJ.n>6){REJ=null;quitToMenu('Lost connection to the host (could not reconnect).');return}
+ netNote('Connection lost - reconnecting ('+REJ.n+'/6)...');
+ const old=hostConn;hostConn=null;try{if(old)old.close()}catch(e){}
+ const go=()=>{if(!G||!LOBBY)return;const hc=peer.connect(PFX+REJ.code,{reliable:true,serialization:'json'});hostConn=hc;let ok=false;
+  hc.on('open',()=>{ok=true;lastHeard=performance.now();netSend(hc,{t:'hello',name:myName(),tok:NETTOK,rejoin:1})});
+  hc.on('data',d=>{lastHeard=performance.now();if(REJ)REJ.busy=false;clientMsg(d,0)});
+  hc.on('close',()=>{if(hostConn===hc){hostConn=null;if(REJ)REJ.busy=false;if(G)clientReconnect('closed')}});
+  NETHB.rt=setTimeout(()=>{if(REJ&&REJ.busy&&hostConn===hc&&!ok){REJ.busy=false;clientReconnect('timeout')}else if(REJ)REJ.busy=false},6000)};
+ lastHeard=performance.now();
+ if(!peer||peer.destroyed){peer=mkPeer(null,LAST_ICE||ICE);peer.on('open',go);peer.on('error',()=>{if(REJ){REJ.busy=false}})}
+ else if(peer.disconnected){try{peer.reconnect()}catch(e){}setTimeout(go,800)}else setTimeout(go,300);
+}

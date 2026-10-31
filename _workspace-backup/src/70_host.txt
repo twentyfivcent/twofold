@@ -1,0 +1,210 @@
+// ===================== HOST AUTHORITY =====================
+let EV=[],nadeId=1,smokeId=1,itemId=1;
+const MAPVOTE_TIME=12, OVER_TIME=6, MELEE_BACK=200, MELEE_FRONT=55;
+const HOST_NADES=['frag','smoke','flash','rocket','sticky','knife','emp','heal','bolt'];
+function emit(e){EV.push(e);handleEvent(e)}
+function canHurt(a,v){return !a||a===v||a.team!==v.team||G.ff}
+function decoyHit(o,d,max){let best=null;for(const dc of G.decoys){const r=rayBox(o,d,[dc.pos[0]-.32,dc.pos[1],dc.pos[2]-.32],[dc.pos[0]+.32,dc.pos[1]+1.8,dc.pos[2]+.32],max);if(r>=0&&r<max&&(!best||r<best.t))best={dc,t:r}}return best}
+function hostAction(pid,m){
+ const p=G.P[pid];if(!p||!p.alive||p.off||G.rs!=='live')return;
+ if(m.t==='shot'){const w=W[m.w];p._shotT=performance.now()/1000;p.cloakT=0;if(!w||!Array.isArray(m.dirs))return;
+  const ch=w.mode==='charge'?Math.max(.12,Math.min(1,+m.ch||1)):1,cm=w.mode==='charge'?.35+.65*ch:1;
+  const hits={},best={},hp={},pens={};let first=true;
+  for(const d0 of m.dirs.slice(0,12)){const d=norm(d0);let r=hitScan(m.o,d,200,pid),pen=null;
+   if(r.who<0&&r.t<200&&w.pen>0){pen=penTrace(m.o,d,r.t,w.pen,pid);if(pen&&pen.r.who>=0)r=pen.r;else pen=null}
+   if(typeof fruitShot==='function')fruitShot(m.o,d,r.t);
+   const dh=decoyHit(m.o,d,r.t);if(dh){dh.dc.hp-=w.dmg;if(first)emit({t:'tr',s:pid,o:m.o,e:[m.o[0]+d[0]*dh.t,m.o[1]+d[1]*dh.t,m.o[2]+d[2]*dh.t]});first=false;continue}
+   if(first||Math.random()<.35)emit({t:'tr',s:pid,o:m.o,e:[m.o[0]+d[0]*r.t,m.o[1]+d[1]*r.t,m.o[2]+d[2]*r.t],w:r.who<0&&r.t<200?1:0});first=false;
+   if(r.who>=0){const f=r.t<=w.r0?1:r.t>=w.r1?w.dmin/w.dmg:1+(w.dmin/w.dmg-1)*(r.t-w.r0)/(w.r1-w.r0);const pi=PART_I[r.part];
+    // every sniper (hs1) kills with a head shot at any range
+    const amt=w.hs1&&pi===0?999:w.dm[pi]*f*cm*(pen?pen.mult:1);if(pen)pens[r.who]=pen.th;
+    hits[r.who]=(hits[r.who]||0)+amt;if(best[r.who]===undefined||pi<best[r.who]){best[r.who]=pi;hp[r.who]=[m.o[0]+d[0]*r.t,m.o[1]+d[1]*r.t,m.o[2]+d[2]*r.t]}}}
+  emit({t:'fx',s:pid,w:m.w,x:m.o[0],y:m.o[1],z:m.o[2]});
+  for(const v in hits){PEN_NOW=pens[v]!==undefined?Math.max(1,Math.round(pens[v]*100)):0;damage(+v,pid,hits[v],m.w,best[v]===0,m.o,PARTS[best[v]],hp[v]);PEN_NOW=0}
+ }else if(m.t==='nade'){if(!HOST_NADES.includes(m.type)||!Array.isArray(m.pos)||!Array.isArray(m.vel))return;
+  if(m.type!=='rocket'&&m.type!=='bolt'){if(!utilHas(p,m.type))return;if(pid!==ME&&!p.bot)utilAdd(p,m.type,-1)}
+  if(m.type==='bolt'&&!(W[m.w]&&W[m.w].mode==='xbow'))return;
+  p.cloakT=0;G.nades.push({id:nadeId++,type:m.type,w:m.w,pos:m.pos.slice(),vel:m.vel.slice(),fuse:Math.min(5,m.fuse),owner:pid,yaw:p.yaw,pitch:p.pitch})}
+ else if(m.t==='melee'){const now=performance.now()/1000;if(p._melT&&now-p._melT<.55)return;p._melT=now;p.cloakT=0;
+  const o=eye(p);let bh=null;
+  for(let a=-2;a<=2;a++)for(const pt of [-.3,0,.22]){const d=dirYP(p.yaw+a*.16,p.pitch+pt);const wt=rayWorld(o,d,2.1);
+   for(const q of G.P){if(q.id===pid||!q.alive||q.off||!canHurt(p,q))continue;const h=hitPlayer(q,o,d,Math.min(2.1,wt));if(h&&(!bh||h.t<bh.t))bh={q,t:h.t,part:h.part,pt:[o[0]+d[0]*h.t,o[1]+d[1]*h.t,o[2]+d[2]*h.t]}}}
+  let hitDc=null;for(const dc of G.decoys)if(dist3(dc.pos,p.pos)<2.2)hitDc=dc;if(hitDc&&!bh)hitDc.hp=0;
+  emit({t:'mel',s:pid,hit:bh?1:0});
+  if(bh){const q=bh.q,fv=dirYP(q.yaw,0),dx=q.pos[0]-p.pos[0],dz=q.pos[2]-p.pos[2],L=Math.hypot(dx,dz)||1;const behind=(fv[0]*dx+fv[2]*dz)/L>.3;
+   damage(q.id,pid,behind?MELEE_BACK:MELEE_FRONT,'melee',false,o,bh.part,bh.pt);if(behind)emit({t:'note',m:p.name+' backstab!',s:pid})}}
+ else if(m.t==='util'){const u=m.type;if(!utilHas(p,u))return;if(pid!==ME&&!p.bot&&u!=='grapple')utilAdd(p,u,-1);
+  if(u==='stim'){p.hp=Math.min(100,p.hp+50);emit({t:'stim',s:pid})}
+  else if(u==='pulse'){const ids=G.P.filter(q=>q.alive&&q.team!==p.team&&dist3(q.pos,p.pos)<20).map(q=>q.id);emit({t:'pulse',team:p.team,ids,s:pid,x:p.pos[0],z:p.pos[2]})}
+  else if(u==='shield'){const f=dirYP(p.yaw,0),cx=p.pos[0]+f[0]*1.3,cz=p.pos[2]+f[2]*1.3,alongX=Math.abs(f[2])>=Math.abs(f[0]);const hw=.85,ht=.13;
+   const b={min:[cx-(alongX?hw:ht),p.pos[1],cz-(alongX?ht:hw)],max:[cx+(alongX?hw:ht),p.pos[1]+1.35,cz+(alongX?ht:hw)],dyn:smokeId++,ttl:15,col:0x6fb6ff,team:p.team};G.boxes.push(b);emit({t:'shield',s:pid,x:cx,z:cz})}
+  else if(u==='decoy'){const f=dirYP(p.yaw,0);G.decoys.push({id:itemId++,team:p.team,owner:pid,pos:[p.pos[0]+f[0]*.8,p.pos[1],p.pos[2]+f[2]*.8],vel:[0,0,0],yaw:p.yaw,t:7,hp:70,fireT:.5,w:p.inv[0].w,ground:true});emit({t:'udep',u,s:pid})}
+  else if(u==='mine'){const f=dirYP(p.yaw,0);const o=[p.pos[0]+f[0]*.5,p.pos[1]+.22,p.pos[2]+f[2]*.5];const L=Math.min(5,rayWorld(o,f,5));G.mines.push({id:itemId++,team:p.team,owner:pid,pos:o,end:[o[0]+f[0]*L,o[1],o[2]+f[2]*L],arm:1});emit({t:'udep',u,s:pid})}
+  else if(u==='pad'){const f=dirYP(p.yaw,0);G.pads.push({id:itemId++,team:p.team,pos:[p.pos[0]+f[0]*1.2,p.pos[1],p.pos[2]+f[2]*1.2],t:22});emit({t:'udep',u,s:pid})}
+  else if(u==='cloak'){p.cloakT=6;emit({t:'cloak',s:pid})}
+  else if(u==='grapple'){if(Array.isArray(m.pt))emit({t:'rope',s:pid,pt:m.pt.map(Number)})}}
+}
+// v7 wallbangs: find how thick the cover is along the ray; if the round can get through, keep tracing with reduced damage
+let PEN_NOW=0;
+function inSolid(q){if(q[1]<=.02)return true;for(const b of G.boxes){if(b.liquid)continue;if(q[0]>b.min[0]&&q[0]<b.max[0]&&q[1]>b.min[1]&&q[1]<b.max[1]&&q[2]>b.min[2]&&q[2]<b.max[2])return true}return false}
+function penTrace(o,d,t0,pen,pid){let t=t0+.01;const lim=t0+pen+.02;while(t<lim){const q=[o[0]+d[0]*t,o[1]+d[1]*t,o[2]+d[2]*t];if(!inSolid(q))break;t+=.03}if(t>=lim)return null;const th=Math.max(.01,t-t0);if(o[1]+d[1]*t<=.02)return null;
+ const o2=[o[0]+d[0]*(t+.01),o[1]+d[1]*(t+.01),o[2]+d[2]*(t+.01)];const r2=hitScan(o2,d,200-t,pid);if(r2.who<0)return null;r2.t+=t+.01;return {r:r2,th,mult:Math.max(.35,.75-.4*th/pen)}}
+function damage(vid,aid,amt,wid,hs,from,part,pt){if(amt<999)amt=Math.max(1,Math.round(amt));if(G&&G.P[vid])G.P[vid].lastHurt=G.el;
+ const v=G.P[vid],a=G.P[aid];if(!v||!v.alive||G.rs!=='live')return;
+ if(!canHurt(a,v))return;
+ if(wid==='knife')amt=Math.max(amt,200);if(wid==='thistle'&&(part==='head'||part==='body'))amt=Math.max(amt,200);/*v8: crossbow head/chest one-shot*/
+ amt=Math.min(v.hp,Math.round(amt));if(amt<=0)return;
+ v.hp-=amt;v.cloakT=Math.min(v.cloakT,.0);if(a&&a!==v&&a.team!==v.team){a.dmg+=amt;(v.hurtBy=v.hurtBy||{})[a.id]=1}
+ emit({t:'dmg',v:vid,a:aid,amt,w:wid,hs:!!hs,part:part||'blast',x:from[0],z:from[2]});
+ if(a)emit({t:'hit',s:aid,v:vid,hs:!!hs,kill:v.hp<=0,amt:Math.round(amt),p:chest(v),pen:PEN_NOW||0});
+ const P=pt||chest(v),dd=norm([P[0]-from[0],P[1]-from[1],P[2]-from[2]]);
+ emit({t:'bl',x:+P[0].toFixed(2),y:+P[1].toFixed(2),z:+P[2].toFixed(2),d:dd.map(x=>+x.toFixed(2)),n:Math.min(3,1+(amt/40|0)),hs:hs?1:0});
+ if(v.bot_){v.bot_.alert=from.slice();v.bot_.hurtFrom=from.slice();v.bot_.hurtT=1.6}
+ if(v.hp<=0){v.alive=false;v.hp=0;v.d++;v.grap=null;if(a&&a!==v&&a.team!==v.team){a.k++;for(const id in (v.hurtBy||{})){const q=G.P[id];if(q&&q!==a&&q.team===a.team)q.as=(q.as|0)+1}}else if(a&&a!==v&&a.team===v.team)a.k--;emit({t:'kf',k:aid,v:vid,w:wid,hs,tk:a&&a!==v&&a.team===v.team?1:0})}
+}
+function empBlast(n,owner){const P=G.P[owner],team=P?P.team:-1,R=8;emit({t:'emp',x:n.pos[0],y:n.pos[1],z:n.pos[2]});
+ for(const q of G.P){if(!q.alive||q.team===team)continue;if(dist3(chest(q),n.pos)<R){q.empT=5;q.cloakT=0}}
+ const far=o=>dist3(o.pos,n.pos)>=R||o.team===team;G.decoys=G.decoys.filter(far);G.mines=G.mines.filter(far);G.pads=G.pads.filter(far);G.heals=G.heals.filter(far);
+ G.boxes=G.boxes.filter(b=>!b.dyn||b.team===team||Math.hypot((b.min[0]+b.max[0])/2-n.pos[0],(b.min[2]+b.max[2])/2-n.pos[2])>=R)}
+function explode(n){
+ if(n.type==='smoke'){G.smokes.push({id:smokeId++,pos:[n.pos[0],Math.max(1.2,n.pos[1]),n.pos[2]],r:0,t:14});emit({t:'pop',x:n.pos[0],y:n.pos[1],z:n.pos[2]});return}
+ if(n.type==='flash'){emit({t:'flash',x:n.pos[0],y:n.pos[1],z:n.pos[2]});for(const q of G.P){if(!q.bot||!q.alive)continue;const e=eye(q);const dd=dist3(e,n.pos);if(dd<20&&los(e,n.pos)){const f=norm([n.pos[0]-e[0],n.pos[1]-e[1],n.pos[2]-e[2]]),v=dirYP(q.yaw,q.pitch);const dot=f[0]*v[0]+f[1]*v[1]+f[2]*v[2];q.blind=Math.max(q.blind,(dot>.2?3.5:1.2)*(1-dd/24))}}return}
+ if(n.type==='emp'){empBlast(n,n.owner);return}
+ if(n.type==='heal'){const P=G.P[n.owner];G.heals.push({id:itemId++,team:P?P.team:0,pos:[n.pos[0],Math.max(0,n.pos[1]-.1),n.pos[2]],t:8});emit({t:'pop',x:n.pos[0],y:n.pos[1],z:n.pos[2],heal:1});return}
+ if(n.type==='knife'||n.type==='bolt')return;
+ const R=n.type==='frag'||n.type==='mine'?6:4.5,D=n.type==='rocket'?150:n.type==='sticky'?135:130;
+ emit({t:'boom',x:n.pos[0],y:n.pos[1],z:n.pos[2]});
+ for(const q of G.P){if(!q.alive)continue;const c=chest(q),dd=dist3(c,n.pos);if(dd>R)continue;const up=[n.pos[0],n.pos[1]+.2,n.pos[2]];if(!los(up,c)&&!los(up,eye(q)))continue;damage(q.id,n.owner,D*(1-dd/R)*(q.id===n.owner?.6:1)+5,n.type==='rocket'?'thumper':n.type,false,n.pos,'blast')}
+ for(const dc of G.decoys)if(dist3(dc.pos,n.pos)<R)dc.hp=0;
+}
+// thrown knives and crossbow bolts fly as projectiles; knives then stay in the world as pick-ups
+function dropKnife(pos,yaw,pitch,stuck){G.knives.push({id:itemId++,pos:pos.map(v=>+v.toFixed(2)),yaw:yaw||0,pitch:pitch||0,stuck:!!stuck,t:0});if(G.knives.length>16)G.knives.shift()}
+function nadeTick(dt){
+ for(const n of G.nades){n.fuse-=dt;
+  if(n.type==='knife'||n.type==='bolt'){n.vel[1]-=(n.type==='bolt'?4:KNIFE_G)*dt;const sp=Math.hypot(...n.vel),d=norm(n.vel);const r=hitScan(n.pos,d,sp*dt,n.owner);
+   const dh=decoyHit(n.pos,d,Math.min(r.t,sp*dt));if(dh){dh.dc.hp=0;if(n.type==='knife')dropKnife([dh.dc.pos[0],.05,dh.dc.pos[2]],n.yaw,0,false);n.dead=true;continue}
+   if(r.who>=0){const q=G.P[r.who];const pt=[n.pos[0]+d[0]*r.t,n.pos[1]+d[1]*r.t,n.pos[2]+d[2]*r.t];
+    if(n.type==='knife'){damage(r.who,n.owner,200,'knife',r.part==='head',n.pos,r.part,pt);dropKnife([q.pos[0]+d[0]*.4,.05,q.pos[2]+d[2]*.4],n.yaw,0,false)}
+    else{const w=W[n.w]||W.thistle;damage(r.who,n.owner,w.dm[PART_I[r.part]],n.w,r.part==='head',n.pos,r.part,pt)}
+    n.dead=true;continue}
+   if(r.t<sp*dt-1e-4||n.pos[1]<.05){const hp=[n.pos[0]+d[0]*r.t,Math.max(.05,n.pos[1]+d[1]*r.t),n.pos[2]+d[2]*r.t];emit({t:'clink',x:hp[0],y:hp[1],z:hp[2]});
+    if(n.type==='knife'){const floor=hp[1]<.12;dropKnife([hp[0]-d[0]*.06,floor?.05:hp[1],hp[2]-d[2]*.06],Math.atan2(-d[0],-d[2]),Math.asin(Math.max(-1,Math.min(1,d[1]))),!floor)}
+    else emit({t:'bstk',x:hp[0]-d[0]*.2,y:hp[1]-d[1]*.2,z:hp[2]-d[2]*.2,yaw:Math.atan2(-d[0],-d[2]),pitch:Math.asin(Math.max(-1,Math.min(1,d[1])))});
+    n.dead=true;continue}
+   for(let a=0;a<3;a++)n.pos[a]+=n.vel[a]*dt;if(n.fuse<=0){if(n.type==='knife')dropKnife([n.pos[0],.05,n.pos[2]],n.yaw,0,false);n.dead=true}continue}
+  if(n.stuck){if(n.att!==undefined){const q=G.P[n.att];if(q&&q.alive)n.pos=[q.pos[0],q.pos[1]+1.1,q.pos[2]]}if(n.fuse<=0){explode(n);n.dead=true}continue}
+  if(n.type==='sticky'){for(const q of G.P){if(q.alive&&q.id!==n.owner&&Math.abs(q.pos[0]-n.pos[0])<.45&&Math.abs(q.pos[2]-n.pos[2])<.45&&n.pos[1]>q.pos[1]&&n.pos[1]<q.pos[1]+pH(q)){n.stuck=true;n.att=q.id}}if(n.stuck)continue}
+  n.vel[1]-=(n.type==='rocket'?9:18)*dt;let hit=false;
+  for(let a=0;a<3;a++){n.pos[a]+=n.vel[a]*dt;let col=n.pos[1]<.08;if(!col)for(const b of G.boxes){if(b.liquid)continue;if(n.pos[0]>b.min[0]-.08&&n.pos[0]<b.max[0]+.08&&n.pos[1]>b.min[1]-.08&&n.pos[1]<b.max[1]+.08&&n.pos[2]>b.min[2]-.08&&n.pos[2]<b.max[2]+.08){col=true;break}}
+   if(col){n.pos[a]-=n.vel[a]*dt;n.vel[a]*=-.4;for(let o=0;o<3;o++)if(o!==a)n.vel[o]*=.75;hit=true}}
+  if(n.type==='rocket'){for(const q of G.P){if(q.alive&&q.id!==n.owner&&Math.abs(q.pos[0]-n.pos[0])<.45&&Math.abs(q.pos[2]-n.pos[2])<.45&&n.pos[1]>q.pos[1]&&n.pos[1]<q.pos[1]+pH(q))hit=true}if(hit)n.fuse=0}
+  if(hit&&n.type==='sticky'){n.stuck=true;n.vel=[0,0,0]}
+  if(hit&&n.type==='heal'&&n.fuse>.3)n.fuse=Math.min(n.fuse,.3);
+  if(n.fuse<=0){explode(n);n.dead=true}}
+ G.nades=G.nades.filter(n=>!n.dead);
+ for(const b of G.boxes)if(b.dyn){b.ttl-=dt}G.boxes=G.boxes.filter(b=>!b.dyn||b.ttl>0);
+ for(const s of G.smokes){s.t-=dt;s.r=s.t>13?(14-s.t)*4.5:s.t<1.5?4.5*s.t/1.5:4.5}
+ G.smokes=G.smokes.filter(s=>s.t>0);
+}
+// deployables: decoys walk and fire blanks, laser snares, jump pads, heal fields, knife pick-ups, cloak/EMP timers
+function deployTick(dt){
+ for(const p of G.P){p.cloakT=Math.max(0,(p.cloakT||0)-dt);p.empT=Math.max(0,(p.empT||0)-dt)}
+ for(const dc of G.decoys){dc.t-=dt;const dp={pos:dc.pos,vel:dc.vel,yaw:dc.yaw,pitch:0,inv:[{w:dc.w}],cur:0,crouch:false,ads:false,ground:dc.ground,id:-1};const ox=dc.pos[0],oz=dc.pos[2];
+  movePlayer(dp,{f:1,r:0},dt);dc.ground=dp.ground;if(Math.hypot(dc.pos[0]-ox,dc.pos[2]-oz)<dt*1.5){dc.yaw+=Math.PI/2*(Math.random()<.5?1:-1)}
+  dc.fireT-=dt;if(dc.fireT<=0){dc.fireT=rnd(.25,.6);const o=[dc.pos[0],dc.pos[1]+1.6,dc.pos[2]],d=dirYP(dc.yaw+rnd(-.5,.5),rnd(-.05,.1)),t=rayWorld(o,d,60);emit({t:'fx',s:-1,w:dc.w,x:o[0],y:o[1],z:o[2],dec:1});emit({t:'tr',s:-1,o,e:[o[0]+d[0]*t,o[1]+d[1]*t,o[2]+d[2]*t]})}}
+ for(const dc of G.decoys)if(dc.hp<=0||dc.t<=0)emit({t:'pop',x:dc.pos[0],y:dc.pos[1]+1,z:dc.pos[2],dec:1});
+ G.decoys=G.decoys.filter(d=>d.hp>0&&d.t>0);
+ for(const mn of G.mines){mn.arm-=dt;if(mn.arm>0||mn.trig)continue;
+  for(const q of G.P){if(!q.alive||q.team===mn.team)continue;const ax=mn.end[0]-mn.pos[0],az=mn.end[2]-mn.pos[2],L2=ax*ax+az*az||1;let u=((q.pos[0]-mn.pos[0])*ax+(q.pos[2]-mn.pos[2])*az)/L2;u=Math.max(0,Math.min(1,u));
+   const cx=mn.pos[0]+ax*u,cz=mn.pos[2]+az*u;if(Math.hypot(q.pos[0]-cx,q.pos[2]-cz)<.42&&q.pos[1]<mn.pos[1]+.3&&q.pos[1]+pH(q)>mn.pos[1]){mn.trig=.22;emit({t:'beep',x:mn.pos[0],y:mn.pos[1],z:mn.pos[2]});break}}}
+ for(const mn of G.mines)if(mn.trig!==undefined&&(mn.trig-=dt)<=0){mn.dead=true;explode({type:'mine',pos:[mn.pos[0],mn.pos[1]+.3,mn.pos[2]],owner:mn.owner})}
+ G.mines=G.mines.filter(m=>!m.dead);
+ for(const pd of G.pads)pd.t-=dt;G.pads=G.pads.filter(p=>p.t>0);
+ for(const h of G.heals){h.t-=dt;for(const q of G.P)if(q.alive&&q.team===h.team&&Math.hypot(q.pos[0]-h.pos[0],q.pos[2]-h.pos[2])<3.5&&Math.abs(q.pos[1]-h.pos[1])<2)q.hp=Math.min(100,q.hp+14*dt)}
+ G.heals=G.heals.filter(h=>h.t>0);
+ for(const k of G.knives)k.t+=dt;
+ for(const p of G.P){if(!p.alive||p.off||!knifeCanPick(p))continue;
+  for(const k of G.knives){if(k.t<.4)continue;const dy=k.pos[1]-p.pos[1];if(Math.hypot(k.pos[0]-p.pos[0],k.pos[2]-p.pos[2])<1.15&&dy>-.6&&dy<2.5){k.gone=true;utilAdd(p,'knife',1);emit({t:'kpick',s:p.id,id:k.id});break}}}
+ G.knives=G.knives.filter(k=>!k.gone);
+}
+function newLoadout(){let pr;do pr=pick(PRIMS);while(pr===G.lastPrim);G.lastPrim=pr;return [pr,pick(SECS),pick(LETHALS),pick(TACTS)]}
+// v7 true-RNG loadouts: crypto randomness, and no primary/secondary/utility combo is ever offered twice in one match
+function cryptoRand(){const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]/4294967296}
+function voteOptions(){if(!G.seenLo)G.seenLo=new Set();const used=new Set();const o=[];const mr=Math.random;Math.random=cryptoRand;let tries=0;
+ try{while(o.length<3){const l=newLoadout();const k=l.join('|');tries++;if(tries<600&&(used.has(l[0])||G.seenLo.has(k)))continue;used.add(l[0]);G.seenLo.add(k);o.push(l)}}finally{Math.random=mr}return o}
+// only human players vote (bots never do); if nobody votes the winner is random
+function hostVote(pid,i){if(!G||G.rs!=='vote'||!(i>=0&&i<3)||!G.P[pid]||G.P[pid].bot)return;G.votes[pid]=i|0}
+function castVote(i){if(!G||G.rs!=='vote')return;SND.ui(880);if(HOST)hostVote(ME,i);else netSend(hostConn,{t:'vote',i});G.myVote=i}
+function tallyVotes(){const c=[0,0,0];for(const p of G.P){const v=G.votes[p.id];if(v>=0&&!p.bot)c[v]++}const mx=Math.max(...c);const top=[0,1,2].filter(i=>c[i]===mx);return pick(top)}
+function humans(){return G.P.filter(p=>!p.bot&&!p.off)}
+function inSpawnZone(p){const flip=G.rn%2===0;let z=p.pos[2]*(flip?-1:1);if(p.team===1)z=-z;return z<=-18.5*MS&&z>=-24*MS&&Math.abs(p.pos[0])<=6*MS}
+function checkSpawns(when){const bad=G.P.filter(p=>!p.off&&p.alive&&!inSpawnZone(p)).map(p=>({id:p.id,team:p.team,pos:p.pos.map(v=>+v.toFixed(1))}));
+ const rec={rn:G.rn,when,ok:bad.length===0,bad};(window.__spawnAsserts=window.__spawnAsserts||[]).push(rec);if(bad.length)console.error('SPAWN ASSERT FAILED',JSON.stringify(rec));return rec}
+function roundStart(){
+ if(typeof revertTakeovers==='function')revertTakeovers();promotePending();G.rn++;G.rs='vote';G.rt=VOTE_TIME;G.el=0;G.opts=voteOptions();G.votes=[-1,-1,-1,-1];G.lo=G.opts[0];G.boxes=G.boxes.filter(b=>!b.dyn);G.ss++;G.nades=[];G.smokes=[];G.flag=pickFlag();G.win=-2;
+ G.decoys=[];G.mines=[];G.pads=[];G.heals=[];G.knives=[];G.took={};for(const p of G.P){p.stam=100;p.slideT=0;p.mant=null;p.inspT=0;p.bloom=0}
+ const flip=G.rn%2===0;
+ for(const p of G.P){const sp=SPAWNS[p.id];const s=flip?[-sp[0],-sp[1]]:sp;p.pos=[s[0],0,s[1]];p.rpos=p.pos.slice();p.vel=[0,0,0];p.yaw=s[1]<0?Math.PI:0;p.ryaw=p.yaw;p.pitch=0;p.hp=100;p.hurtBy={};p.alive=!p.off;p.crouch=false;p.blind=0;equip(p,G.lo);p.bot_=null;p.ads=false;p.adsAmt=0;
+  if(p.off){p.pos=[0,-60,0];p.rpos=p.pos.slice()}}
+ checkSpawns('round');
+ emit({t:'round'});
+}
+function teamAlive(t){return G.P.filter(p=>p.team===t&&p.alive&&!p.off).length}
+function teamHP(t){return G.P.filter(p=>p.team===t&&p.alive).reduce((a,p)=>a+p.hp,0)}
+function endRound(win,why){G.rs='end';G.rt=END_TIME;G.win=win;if(win>=0)G.sc[win]++;emit({t:'rend',win,why});if(G.sc[0]>=ROUNDS_TO_WIN||G.sc[1]>=ROUNDS_TO_WIN){G.rs='over';G.rt=OVER_TIME;if(typeof revertTakeovers==='function')revertTakeovers();const mv=computeMVP();G.mvp=mv;emit({t:'over',win,mvp:mv.id,mvs:mv.score,mvb:mv.bot?1:0,mvn:mv.name,ps:G.P.map(p=>[p.k|0,p.d|0,p.name,p.bot?1:0,Math.round(p.dmg||0)])})}}
+function mapVoteOptions(){const o=[];const all=MAPS.map((m,i)=>i).filter(i=>i!==G.mapIdx);while(o.length<3&&all.length)o.push(all.splice(Math.floor(Math.random()*all.length),1)[0]);return o}
+function hostMapVote(pid,i){if(!G||G.rs!=='mapvote'||!(i>=0&&i<3)||!G.P[pid]||G.P[pid].bot)return;G.mvotes[pid]=i|0}
+function castMapVote(i){if(!G||G.rs!=='mapvote')return;SND.ui(880);G.myMVote=i;if(HOST)hostMapVote(ME,i);else netSend(hostConn,{t:'mvote',i})}
+function hostTick(dt){
+ // health regenerates after 4s without taking damage
+ if(G.rs==='live'||G.rs==='end')for(const p of G.P)if(p.alive&&p.hp<100&&G.el-(p.lastHurt||-9)>4)p.hp=Math.min(100,p.hp+14*dt);
+ nadeTick(dt);deployTick(dt);
+ G.rt-=dt;
+ if(G.rs==='vote'){const hs=humans();
+  const all=hs.length>0&&hs.every(p=>G.votes[p.id]>=0);if(G.rt<=0||(all&&G.rt<VOTE_TIME-3)||(!hs.length&&G.rt<VOTE_TIME-2)){const win=tallyVotes();G.lo=G.opts[win];G.voteWin=win;for(const p of G.P)equip(p,G.lo);G.ss++;G.rs='pre';G.rt=PRE_TIME;emit({t:'voted',i:win})}}
+ else if(G.rs==='pre'){if(G.rt<=0){G.rs='live';G.rt=ROUND_TIME;checkSpawns('go');emit({t:'go'})}}
+ else if(G.rs==='live'){G.el+=dt;
+  const a0=teamAlive(0),a1=teamAlive(1);
+  if(a0===0||a1===0){endRound(a0===a1?-1:a0>0?0:1,'elim');return}
+  if(G.el>=FLAG_AT&&!G.flag.on){G.flag.on=true;emit({t:'flagon'})}
+  if(G.flag.on){const f=flagPos();let on=[0,0];for(const p of G.P)if(p.alive&&Math.hypot(p.pos[0]-f[0],p.pos[2]-f[2])<2.5&&Math.abs(p.pos[1]-f[1])<1.6)on[p.team]++;
+   const fl=G.flag;if(on[0]&&!on[1]||on[1]&&!on[0]){const t=on[0]?0:1;for(const p of G.P)if(p.alive&&p.team===t&&Math.hypot(p.pos[0]-f[0],p.pos[2]-f[2])<2.5)p.fp=(p.fp||0)+dt;if(fl.team===t||fl.p<=0){fl.team=t;fl.p+=dt}else fl.p-=dt*2}else if(!on[0]&&!on[1])fl.p=Math.max(0,fl.p-dt*.5);
+   if(fl.p>=FLAG_HOLD){for(const p of G.P)if(p.alive&&p.team===fl.team&&Math.hypot(p.pos[0]-f[0],p.pos[2]-f[2])<2.5)p.fc=(p.fc|0)+1;endRound(fl.team,'flag');return}}
+  if(G.rt<=0){const h0=teamHP(0),h1=teamHP(1);endRound(h0===h1?-1:h0>h1?0:1,'time')}}
+ else if(G.rs==='end'){if(G.rt<=0)roundStart()}
+ else if(G.rs==='over'){if(G.rt<=0){G.rs='mapvote';G.rt=MAPVOTE_TIME;G.mopts=mapVoteOptions();G.mvotes=[-1,-1,-1,-1];emit({t:'mapvote'})}}
+ else if(G.rs==='mapvote'&&G.qp){}
+ else if(G.rs==='mapvote'){const hs=humans();const all=hs.length>0&&hs.every(p=>G.mvotes[p.id]>=0);
+  if(G.rt<=0||(all&&G.rt<MAPVOTE_TIME-8)){const c=[0,0,0];for(const p of hs)if(G.mvotes[p.id]>=0)c[G.mvotes[p.id]]++;const mx=Math.max(...c);const wi=pick([0,1,2].filter(i=>c[i]===mx));
+   G.nextMap=G.mopts[wi];G.rs='nextmap';G.rt=1.2;emit({t:'nextmap',m:G.nextMap,i:wi})}}
+ else if(G.rs==='nextmap'){if(G.rt<=0)hostNextMatch(G.nextMap)}
+}
+// restart on the voted map with the same lobby (humans keep their slots, bots/empty slots stay as configured)
+function hostNextMatch(map){if(typeof promotePending==="function")promotePending();const slots=G.P.map(p=>({name:p.bot?p.name.replace(/ \(bot\)$/,''):p.name,bot:p.bot,off:p.off,conn:p.conn}));const ff=G.ff;
+ const wire=slots.map(s=>({name:s.name,bot:s.bot,off:s.off}));
+ const tod=rollTod(map);slots.forEach((s,i)=>{if(s.conn&&!s.bot)netSend(s.conn,{t:'start',map,slots:wire,you:i,ff,tod})});
+ startGame({map,slots,me:ME,host:true,ff,tod})}
+function r2(v){return +v.toFixed(2)}
+function snapshot(){
+ const s={t:'snap',td:G.tod,rs:G.rs,rt:+G.rt.toFixed(2),el:+G.el.toFixed(1),sc:G.sc,rn:G.rn,ss:G.ss,lo:G.lo,win:G.win,fl:G.flag,op:G.opts,vt:G.votes,vw:G.voteWin,ff:G.ff?1:0,
+  D:G.boxes.filter(b=>b.dyn).map(b=>[b.dyn,...b.min.map(r2),...b.max.map(r2)]),
+  P:G.P.map(p=>[r2(p.pos[0]),r2(p.pos[1]),r2(p.pos[2]),+p.yaw.toFixed(3),+p.pitch.toFixed(3),Math.ceil(p.hp),p.alive?1:0,p.crouch?1:0,WIDS.indexOf(p.inv[p.cur].w),p.k,p.d,p.dmg,p.bot?1:0,p.name,p.ads?1:0,p.reloadT>0?1:0,p.cloakT>0?1:0,p.off?1:0,p.empT>0?1:0,p.meleeT>0?1:0,heldOf(p),skinOf(p)||0,(p.inspT>0||p.inspF)?1:0,(p.slideT>0||p.slideF)?1:0,(p.mant||p.mantF)?1:0]),
+  N:G.nades.map(n=>[n.id,n.type,r2(n.pos[0]),r2(n.pos[1]),r2(n.pos[2]),n.owner]),
+  S:G.smokes.map(s=>[s.id,s.pos[0],s.pos[1],s.pos[2],+s.r.toFixed(2)]),
+  K:G.knives.map(k=>[k.id,k.pos[0],k.pos[1],k.pos[2],+k.yaw.toFixed(2),+k.pitch.toFixed(2),k.stuck?1:0]),
+  Dc:G.decoys.map(d=>[d.id,d.team,r2(d.pos[0]),r2(d.pos[1]),r2(d.pos[2]),+d.yaw.toFixed(2)]),
+  Mn:G.mines.map(m=>[m.id,m.team,r2(m.pos[0]),r2(m.pos[1]),r2(m.pos[2]),r2(m.end[0]),r2(m.end[2])]),
+  Pd:G.pads.map(p=>[p.id,p.team,r2(p.pos[0]),r2(p.pos[1]),r2(p.pos[2])]),
+  Hl:G.heals.map(h=>[h.id,h.team,r2(h.pos[0]),r2(h.pos[1]),r2(h.pos[2]),r2(h.t)]),vp:voiceIds(),ev:EV};
+ if(G.rs==='mapvote'||G.rs==='nextmap'){s.mo=G.mopts;s.mv=G.mvotes;s.nm=G.nextMap}
+ return s;
+}
+
+// v6 flag spawns: 3 validated points per map (0 = centre). Host picks one per round at random, never the same twice in a row.
+function pickFlag(){const m=G.mapDef,fl=m.flags&&m.flags.length?m.flags:[m.flag];let i=Math.floor(Math.random()*fl.length);if(fl.length>1&&i===G.lastFlagI)i=(i+1+Math.floor(Math.random()*(fl.length-1)))%fl.length;G.lastFlagI=i;
+ return {on:false,team:-1,p:0,i,pos:fl[i].slice(),n:(m.flagNames&&m.flagNames[i])||'Centre'}}
+function flagPos(){return G.flag&&G.flag.pos||G.mapDef.flag}
+
+// v6 MVP: host-computed top match score across humans AND bots. Score = kills*100 + damage*.5 + assists*40 + flag caps*150 + flag-hold seconds*10.
+function mvpScore(p){return Math.round((p.k|0)*100+(p.dmg||0)*.5+(p.as|0)*40+(p.fc|0)*150+(p.fp||0)*10)}
+function computeMVP(){let best=null;for(const p of G.P){if(p.off)continue;const sc=mvpScore(p);if(!best||sc>best.score)best={id:p.id,score:sc,bot:!!p.bot,name:p.name}}return best||{id:-1,score:0,bot:true}}

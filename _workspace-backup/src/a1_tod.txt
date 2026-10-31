@@ -1,0 +1,25 @@
+
+// ===================== v6 TIME OF DAY (host-rolled, synced in 'start' + snapshot 'td') =====================
+const TODS=['dawn','day','dusk','night'];
+// Frostline keeps its calm night sky: it only rolls night (native) or a soft dusk.
+function rollTod(mi){try{const q=new URLSearchParams(location.search).get('tod');if(TODS.includes(q))return q}catch(e){}const m=MAPS[mi];const pool=m.night?['night','night','dusk']:TODS;return pool[Math.floor(Math.random()*pool.length)]}
+function mixC(a,b,t){const r=(a>>16&255)*(1-t)+(b>>16&255)*t,g=(a>>8&255)*(1-t)+(b>>8&255)*t,bl=(a&255)*(1-t)+(b&255)*t;return (Math.round(r)<<16)|(Math.round(g)<<8)|Math.round(bl)}
+function todMap(m,tod){
+ if(!tod)return m;const nativeNight=!!m.night;
+ if(tod==='day'&&!nativeNight&&!m.nativeDusk)return m;if(tod==='dusk'&&m.nativeDusk)return m;if(tod==='night'&&nativeNight)return m;
+ const o=Object.assign({},m,{tod});const S=m.sky2,L=m.light;
+ const P={dawn:{top:0x2a3a6a,mid:0x9a8ab8,hor:0xffb890,sun:[.8,.18,-.3],sc:0xffc8a0,lc:0xffc8a8,k:.8,fog:0xc8a8b0,ft:.5,st:.1},
+  day:{top:0x3a7ad0,mid:0x8ab8e8,hor:0xf0e8d8,sun:[.35,.85,.3],sc:0xfff4e0,lc:0xfff2e0,k:1.6,fog:0xc8d4e0,ft:.6,st:0},
+  dusk:{top:0x1a1838,mid:0x6a3a6a,hor:0xff8a50,sun:[-.8,.14,.3],sc:0xff9050,lc:0xffa070,k:.75,fog:0x6a4a58,ft:.55,st:.25},
+  night:{top:0x02040a,mid:0x0a1224,hor:0x1a2438,sun:[.3,.6,-.5],sc:0x9ab0d8,lc:0xa8bce0,k:.6,fog:0x101a28,ft:.75,st:1}}[tod];
+ o.sky2=Object.assign({},S,{top:P.top,mid:P.mid,hor:P.hor,sun:P.sun,sunCol:P.sc,stars:Math.max(P.st,0),moon:tod==='night'?1:0});
+ const hemiI=tod==='night'?Math.max(.5,L.hemi[2]*.8):L.hemi[2]*(tod==='day'?1:.85);
+ o.light={hemi:[mixC(L.hemi[0],tod==='night'?0x5a6a8a:P.lc,.5),mixC(L.hemi[1],0x202430,tod==='night'?.6:.2),hemiI],sun:[P.lc,tod==='day'?Math.max(L.sun[1],1.5):Math.max(.7,L.sun[1]*P.k)],amb:Math.max(L.amb||.1,tod==='night'?.22:.12)};
+ o.fog=[mixC(m.fog[0],P.fog,P.ft),m.fog[1],m.fog[2]];
+ if(tod==='night'&&!nativeNight)o.todNight=1;
+ if(nativeNight&&tod!=='night')o.sky2.moon=0;
+ return o}
+// Night readability: blue rim light from behind the sun + warm lamp posts on the perimeter (meshes only, non-collidable).
+function todNightLights(m){const rim=new THREE.DirectionalLight(lin(0x8aa8ff),.45);rim.position.set(-m.sky2.sun[0]*60,40,-m.sky2.sun[2]*60);mapGroup.add(rim);G.rimLight=rim;
+ const low=settings.quality==='low';const pts=low?[[-MX+1,0],[MX-1,0]]:[[-MX+1,-MZ*.4],[MX-1,MZ*.4],[-MX+1,MZ*.4],[MX-1,-MZ*.4],[0,-MZ+1],[0,MZ-1]];
+ for(const [x,z] of pts){const pl=new THREE.PointLight(lin(0xffc890),1.1,24,2);pl.position.set(x,4.2,z);mapGroup.add(pl);const b=new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),new THREE.MeshBasicMaterial({color:lin(0xffe0a8)}));b.position.set(x,4.2,z);mapGroup.add(b)}}

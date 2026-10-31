@@ -1,0 +1,92 @@
+// ===================== v7 BATCH 4: shallow water (wading), beach backdrop, sudden-death arenas =====================
+// ---- shallow water: m.wade = [[x,z,w,d,depth]] in half-coords (auto-mirrored like 'half'). Pure visual + movement volume:
+// never collides, never blocks nav, never counts as floor, so the validator's rules are untouched. Deep water stays a blocking 'liquid' box.
+const WADE_ADD={'Dockyard 9':[[-10.4,-7.4,2.4,3.4,.2]],'Tlaloc Steps':[[-7,-11,4.4,7.2,.3]],'Cloudgate Monastery':[[-7,-12,5,5,.25]]};
+{const _pm=prepMaps;prepMaps=function(){for(const m of MAPS){if(m._wprep)continue;m._wprep=1;const W=(m.wade||[]).concat(WADE_ADD[m.n]||[]);const R=[];
+  for(const [x,z,w,d,dp] of W){const X=x*MS,Z=z*MS,ww=w*MS,dd=d*MS;R.push({x0:X-ww/2,x1:X+ww/2,z0:Z-dd/2,z1:Z+dd/2,d:dp});const mx=m.mirror==='z'?X:-X;R.push({x0:mx-ww/2,x1:mx+ww/2,z0:-Z-dd/2,z1:-Z+dd/2,d:dp})}m.wadeR=R}
+ return _pm.apply(this,arguments)}}
+function wadeDepth(x,y,z,m){m=m||(G&&G.mapDef);if(!m)return 0;let d=0;if(typeof liqAt==='function'&&G&&(!m||m===G.mapDef)&&liqAt(x,z)&&y<.14)d=.18-y;if(!m.wadeR)return d;for(const r of m.wadeR)if(x>r.x0&&x<r.x1&&z>r.z0&&z<r.z1&&y<r.d-.04)d=Math.max(d,r.d-Math.max(0,y));return d}
+// ~0.8x at knee depth, slower the deeper it gets (0.42m -> 0.79x, 0.2m -> 0.85x)
+function wadeMul(p){if(!G||!p||!p.pos)return 1;const d=wadeDepth(p.pos[0],p.pos[1],p.pos[2]);if(d>0&&typeof liqAt==='function'&&liqAt(p.pos[0],p.pos[2]))return .8;return d>0?Math.max(.7,.9-.26*d):1}
+window.__wade={depth:wadeDepth,mul:wadeMul};
+// ---- visuals: animated translucent water sheet + wet ground underlay; ripples + splash particles + wading sound while moving
+const RIPS=[];let RIPGEO=null;const WAVES=[];let SOFTT=null;
+// b5: soft rounded-rect alpha (edges fade over ~20%) shared by water sheets, foam and wet-sand underlays
+function wadeSoftTex(){if(SOFTT)return SOFTT;const N=128,cv=document.createElement('canvas');cv.width=cv.height=N;const x=cv.getContext('2d'),im=x.createImageData(N,N);
+ for(let j=0;j<N;j++)for(let i=0;i<N;i++){const u=Math.min(i,N-1-i)/(N*.2),v=Math.min(j,N-1-j)/(N*.2);let a=Math.min(1,u)*Math.min(1,v);a=a*a*(3-2*a);const k=(j*N+i)*4;im.data[k]=im.data[k+1]=im.data[k+2]=255*a;im.data[k+3]=255}
+ x.putImageData(im,0,0);SOFTT=new THREE.CanvasTexture(cv);return SOFTT}
+function wadeBuild(m){WAVES.length=0;const R=(MAPS.find(q=>q.n===m.n)||m).wadeR||[];if(!R.length)return;const low=settings.quality==='low';
+ const wm=new THREE.MeshStandardMaterial({color:lin(m.beach?0x3fb0c0:0x3a6a74),roughness:.05,metalness:.25,transparent:true,opacity:m.beach?.58:.66,depthWrite:false,normalMap:low?null:derived('water').n});
+ if(wm.normalMap){wm.normalMap=wm.normalMap.clone();wm.normalMap.needsUpdate=true;wm.normalMap.wrapS=wm.normalMap.wrapT=THREE.RepeatWrapping;wm.normalMap.repeat.set(3,3);wm.normalScale=new THREE.Vector2(.5,.5)}waterMats.push(wm);
+ const wet=new THREE.MeshStandardMaterial({color:lin(m.beach?0x8a7a58:0x3a3a36),roughness:.35,transparent:true,opacity:.55,depthWrite:false});
+ const soft=wadeSoftTex();wm.alphaMap=soft;wm.opacity=m.beach?.78:.8;wet.alphaMap=soft;wet.opacity=.75;
+ for(const r of R){const w=r.x1-r.x0,d=r.z1-r.z0,cx=(r.x0+r.x1)/2,cz=(r.z0+r.z1)/2;
+  const g=new THREE.Mesh(new THREE.PlaneGeometry(w+1.6,d+1.6),wet);g.rotation.x=-Math.PI/2;g.position.set(cx,.012,cz);g.renderOrder=1;mapGroup.add(g);
+  const sx=Math.max(4,Math.round(w*1.5)),sz=Math.max(4,Math.round(d*1.5));const geo=new THREE.PlaneGeometry(w+.5,d+.5,sx,sz);geo.userData.base=Float32Array.from(geo.attributes.position.array);
+  const s=new THREE.Mesh(geo,wm);s.rotation.x=-Math.PI/2;s.position.set(cx,r.d,cz);s.renderOrder=2;s.userData.wade=1;mapGroup.add(s);WAVES.push(s);
+  if(m.beach&&!low){const fm=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.35,depthWrite:false,alphaMap:soft});const f=new THREE.Mesh(new THREE.PlaneGeometry(.6,d),fm);f.rotation.x=-Math.PI/2;f.position.set(cx<0?r.x1-.3:r.x0+.3,r.d+.006,cz);f.userData.foam=1;f.userData.fx=f.position.x;f.userData.dir=cx<0?1:-1;mapGroup.add(f)}}
+ if(!RIPGEO)RIPGEO=new THREE.RingGeometry(.82,1,28)}
+function ripple(x,y,z,s){if(!RIPGEO||!mapGroup)return;let r=RIPS.find(q=>q.t<=0);if(!r){if(RIPS.length>=28)return;const m=new THREE.Mesh(RIPGEO,new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,depthWrite:false}));m.rotation.x=-Math.PI/2;m.renderOrder=3;r={m,t:0};RIPS.push(r)}
+ if(r.m.parent!==mapGroup)mapGroup.add(r.m);r.t=r.T=.9;r.s=s||.6;r.m.position.set(x,y+.006,z)}
+function splash(x,y,z,k){if(typeof PN==='undefined'||!PN)return;for(let i=0;i<Math.round(5*k);i++)PN.emit([x+rnd(-.15,.15),y+.02,z+rnd(-.15,.15)],[rnd(-.7,.7),rnd(1.2,2.4)*k,rnd(-.7,.7)],0xe8f6ff,rnd(.05,.11),rnd(.35,.6),9,1,.3);ripple(x,y,z,.5+.4*k)}
+const WSND={};function wadeSound(pos,loud){try{const g=SND.out(pos,loud);if(!g)return;const t=AC.currentTime;SND.nz(g,t,.16,'bandpass',700+Math.random()*500,2,.8);SND.nz(g,t+.06,.12,'lowpass',420,1,.5)}catch(e){}}
+// own footsteps / others' footsteps: replaced by wading sloshes in water
+{const _st=SND.step;SND.step=function(pos,loud){const q=pos?pos:(G&&G.P[ME]?G.P[ME].pos:null);if(q&&G&&wadeDepth(q[0],q[1],q[2])>0){wadeSound(pos,(loud||.5)*(pos?1:.45));return}return _st.apply(this,arguments)}}
+function wadeFrame(dt){if(!G||!G.mapDef)return;const t=performance.now()/1000;
+ for(const r of RIPS){if(r.t<=0){r.m.visible=false;continue}r.t-=dt;const k=1-r.t/r.T;r.m.visible=true;r.m.scale.setScalar(.15+r.s*k*1.6);r.m.material.opacity=.45*(1-k)}
+ if(mapGroup)for(const o of mapGroup.children)if(o.userData.foam){const k=Math.sin(t*.9+o.position.z*.1);o.material.opacity=.2+.16*(.5+.5*k);o.position.x=o.userData.fx+o.userData.dir*.35*k}
+ if(settings.quality!=='low')for(const w of WAVES){const a=w.geometry.attributes.position,b=w.geometry.userData.base;for(let i=0;i<a.count;i++){const X=b[i*3],Y=b[i*3+1];a.array[i*3+2]=.018*Math.sin(X*1.7+t*1.6)+.014*Math.sin(Y*2.3-t*1.2)}a.needsUpdate=true}
+ G.P.forEach((p,i)=>{if(!p||p.off||!p.alive)return;const q=p.rpos||p.pos;const d=wadeDepth(q[0],q[1],q[2]);if(!d){p._wd=0;p._wlp=null;return}
+  const lp=p._wlp||q;const sp=dt>0?Math.hypot(q[0]-lp[0],q[2]-lp[2])/dt:0;p._wlp=[q[0],q[1],q[2]];if(!p._wd){splash(q[0],(typeof liqAt==='function'&&liqAt(q[0],q[2]))?.18:((G.mapDef.wadeR||[]).find(r=>q[0]>r.x0&&q[0]<r.x1&&q[2]>r.z0&&q[2]<r.z1)||{d}).d,q[2],1.3);p._wd=1}
+  p._wdist=(p._wdist||0)+sp*dt;p._rt=(p._rt||0)-dt;const surf=q[1]+d;
+  if(sp>.8&&p._wdist>.9){p._wdist=0;splash(q[0],surf,q[2],Math.min(1.4,.5+sp*.12))}else if(p._rt<=0){p._rt=1.2;ripple(q[0],surf,q[2],.35)}})}
+{const _rf=renderFrame;renderFrame=function(){try{wadeFrame(Math.min(.05,(performance.now()-(window.__wT||performance.now()))/1000))}catch(e){}window.__wT=performance.now();return _rf.apply(this,arguments)}}
+{const _bm=buildMap;buildMap=function(m){const r=_bm.apply(this,arguments);for(const q of RIPS){q.t=0}try{wadeBuild(G&&G.mapDef||m)}catch(e){console.warn('wade',e)}return r}}
+// ---- beach backdrop: open ocean on the surf side, islands, sailboats, cargo ship, palms, resort towers inland, pier
+{const _bb=buildBackdrop;buildBackdrop=function(m,ring,low){_bb.apply(this,arguments);if(!m.beach)return;const M=(c,t)=>matT(c,t);
+ const sea=new THREE.MeshStandardMaterial({color:lin(0x2a8ab0),roughness:.12,metalness:.25,normalMap:low?null:derived('water').n});if(sea.normalMap){sea.normalMap=sea.normalMap.clone();sea.normalMap.needsUpdate=true;sea.normalMap.wrapS=sea.normalMap.wrapT=THREE.RepeatWrapping;sea.normalMap.repeat.set(40,40)}waterMats.push(sea);
+ const o=new THREE.Mesh(new THREE.PlaneGeometry(700,700),sea);o.rotation.x=-Math.PI/2;o.position.set(MX+350+6,-.35,0);mapGroup.add(o);
+ const sand=new THREE.Mesh(new THREE.PlaneGeometry(40,400),M(0xd8c08a,'sand'));sand.rotation.x=-Math.PI/2;sand.position.set(MX+8,-.2,0);mapGroup.add(sand);
+ const sand2=new THREE.Mesh(new THREE.PlaneGeometry(300,400),M(0xc8b080,'sand'));sand2.rotation.x=-Math.PI/2;sand2.position.set(-MX-150,-.1,0);mapGroup.add(sand2);
+ for(const [x,z,r] of [[160,-120,26],[230,60,38],[140,170,18]]){const isl=new THREE.Mesh(new THREE.SphereGeometry(r,14,8),M(0x4a7a4a,'hedge'));isl.scale.y=.28;isl.position.set(x,-2,z);mapGroup.add(isl)}
+ for(let i=0;i<5;i++){const x=rnd(70,150),z=rnd(-120,120);addM(boxGeo(5,.8,1.6,1),M(0xf0f0f0,'wood'),x,.2,z);const sl=new THREE.Mesh(new THREE.ConeGeometry(2.2,7,3),new THREE.MeshStandardMaterial({color:lin(0xffffff),roughness:.8}));sl.scale.z=.12;sl.position.set(x,4.2,z);mapGroup.add(sl)}
+ addM(boxGeo(80,6,12,2),M(0x7a3a2a,'container'),260,2,-60);addM(boxGeo(14,10,10,1),M(0xe8e8e8,'metal'),232,9,-60);
+ ring(low?6:14,48,70,(x,z)=>{if(x>MX)return;const w=rnd(10,16),h=rnd(30,60),d=rnd(10,16);const t=addM(new THREE.BoxGeometry(w,h,d),resortMat(w,h,d),x-30,h/2-.2,z);t.rotation.y=Math.atan2(z,x)});
+ beachDecor(low);
+ for(const s of [-1,1])addM(boxGeo(4,.5,60,2),M(0x9a7a52,'planks'),MX+20,1.6,s*55);
+ if(!low)ring(26,MX+4,MX+30,(x,z)=>{if(Math.abs(z)<MZ+2&&Math.abs(x)<MX+2)return;const h=rnd(5,8),lean=rnd(-.25,.25);const tr=addM(new THREE.CylinderGeometry(.16,.26,h,7),M(0x8a6a44,'bark'),x,h/2,z);tr.rotation.z=lean;
+  for(let k=0;k<6;k++){const f=addM(boxGeo(.4,.05,2.6,1),M(0x3a8a3a,'hedge'),x-Math.sin(lean)*h*.5,h,z);f.rotation.y=k*1.05;f.rotation.x=.35}});
+}}
+// ---- SUDDEN DEATH at (ROUNDS_TO_WIN-1) all: host swaps to the map's enclosed SD variant for the deciding round; clients follow via snapshot 'sd'
+function setSD(on){if(!G||!!G.sd===!!on)return;G.sd=on?1:0;const m=on?SDMAPS[G.mapIdx]:MAPS[G.mapIdx];if(!m)return;G.mapDef=m;
+ const dyn=(G.boxes||[]).filter(b=>b.dyn);G.boxes=buildBoxes(m).concat(dyn);try{buildMap(m)}catch(e){console.warn('sd build',e)}
+ if(typeof miniReset==='function')try{miniReset()}catch(e){}
+ if(on){try{addKF('<span style="color:#ff5a4a;font-weight:700">SUDDEN DEATH \u2014 deciding round in the '+m.n.replace(' \u2014 Sudden Death','')+' arena</span>')}catch(e){}try{SND.sting&&SND.sting('vote')}catch(e){}}
+ document.body.classList.toggle('suddendeath',!!on)}
+window.__sd=setSD;
+{const _rs=roundStart;roundStart=function(){if(G&&!G.sd&&G.sc[0]===ROUNDS_TO_WIN-1&&G.sc[1]===ROUNDS_TO_WIN-1)setSD(true);return _rs.apply(this,arguments)}}
+{const _sn=snapshot;snapshot=function(){const s=_sn.apply(this,arguments);if(s&&G)s.sd=G.sd?1:0;return s}}
+{const _as=applySnap;applySnap=function(s){if(G&&s&&(s.sd|0)!==(G.sd|0))setSD(!!s.sd);return _as.apply(this,arguments)}}
+{const _sg=startGame;startGame=function(){document.body.classList.remove('suddendeath');return _sg.apply(this,arguments)}}
+
+// b5: resort tower facade (window grid + balconies + floor bands) as a canvas texture; one per size class (cached)
+const RESORT={};function resortMat(w,h,d){const fl=Math.round(h/3.2),cols=Math.max(3,Math.round(w/2.6)),key=fl+'x'+cols;if(RESORT[key])return RESORT[key];
+ const W=256,H=Math.min(1024,fl*24),cv=document.createElement('canvas');cv.width=W;cv.height=H;const x=cv.getContext('2d');x.fillStyle='#ece6da';x.fillRect(0,0,W,H);
+ const fh=H/fl,cw=W/cols;for(let f=0;f<fl;f++){const y=f*fh;x.fillStyle='#d6cfc2';x.fillRect(0,y+fh-3,W,3);
+  for(let c=0;c<cols;c++){const X=c*cw;const lit=Math.random();x.fillStyle=lit<.15?'#f6e6b0':lit<.6?'#5a86a8':'#3e6684';x.fillRect(X+cw*.14,y+fh*.18,cw*.72,fh*.56);
+   x.fillStyle='rgba(255,255,255,.35)';x.fillRect(X+cw*.14,y+fh*.18,cw*.72,2);x.fillStyle='#f4f2ee';x.fillRect(X+cw*.06,y+fh*.74,cw*.88,fh*.12);x.fillStyle='rgba(0,0,0,.18)';x.fillRect(X+cw*.06,y+fh*.86,cw*.88,2)}}
+ x.fillStyle='#c84a3a';x.fillRect(0,0,W,8);const t=new THREE.CanvasTexture(cv);t.encoding=THREE.sRGBEncoding;t.anisotropy=4;
+ return RESORT[key]=new THREE.MeshStandardMaterial({map:t,roughness:.7,metalness:.05})}
+// b5: render-only beach dressing (never in G.boxes): umbrellas + towels, kayaks, buoys, lifeguard flags, beach balls, wet-sand band
+function beachDecor(low){const P=(hx,hz,f)=>{for(const sg of [1,-1])f(sg*hx*MS,sg*hz*MS,sg)};const mat=c=>new THREE.MeshStandardMaterial({color:lin(c),roughness:.7});
+ const um=[0xe84a3a,0x2a8ab0,0xf0c040,0x3ab07a];let ui=0;
+ for(const [hx,hz] of [[-6.6,-9.6],[2.4,-6.6],[-11.6,-15],[3.4,-15.6],[-3.2,-14.6]])P(hx,hz,(x,z)=>{const c=um[ui++%4];addM(new THREE.CylinderGeometry(.04,.04,2.3,6),mat(0xeeeeee),x,1.15,z);
+  const cap=addM(new THREE.ConeGeometry(1.25,.5,10,1,true),new THREE.MeshStandardMaterial({color:lin(c),roughness:.8,side:THREE.DoubleSide}),x,2.2,z);
+  const tw=addM(new THREE.BoxGeometry(.8,.02,1.7),mat(um[(ui+1)%4]),x+.7,.015,z+.2);tw.rotation.y=.4});
+ if(!low){for(const [hx,hz,r] of [[11.8,-10.6,.3],[8.4,-15.2,1.2],[-8.8,-1.2,.9]])P(hx,hz,(x,z)=>{const k=addM(new THREE.SphereGeometry(1,12,8),mat(0xf06a2a),x,.14,z);k.scale.set(.34,.16,1.5);k.rotation.y=r});
+  for(let i=0;i<9;i++){addM(new THREE.SphereGeometry(.28,8,6),mat(i%2?0xffffff:0xe84a3a),MX+10+i%2*3,.05,-30+i*7.5)}
+  /*v8: lifeguard flags were at y 4.7-7.9 beside the tower (deck top is 2.55) -> floating mid-air. Now they stand on the deck corner posts.*/P(1.55,-2.65,(x,z)=>{addM(new THREE.CylinderGeometry(.03,.03,2.0,5),mat(0xcccccc),x,2.55+1.0,z);const f=addM(new THREE.PlaneGeometry(.9,.6),new THREE.MeshStandardMaterial({color:lin(0xe84a3a),side:THREE.DoubleSide}),x+.45*Math.sign(x||1),2.55+1.65,z);f.userData.v8flag=1});
+  P(-1.2,-9.4,(x,z)=>addM(new THREE.SphereGeometry(.22,10,8),mat(0xf0e040),x,.22,z))}
+ // wet-sand band along the waterline (east side, both halves) - soft edged
+ const ws=new THREE.MeshStandardMaterial({color:lin(0x9a8458),roughness:.3,transparent:true,opacity:.7,depthWrite:false,alphaMap:wadeSoftTex()});const b=new THREE.Mesh(new THREE.PlaneGeometry(4,2*MZ+8),ws);b.rotation.x=-Math.PI/2;b.position.set(MX+1,.01,0);mapGroup.add(b);
+ const b2=b.clone();b2.position.set(-MX-1,.01,0);mapGroup.add(b2)}

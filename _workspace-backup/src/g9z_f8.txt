@@ -1,0 +1,12 @@
+// ===== V8.1 (N) one "Graphics" control (Low / Med / High, default Med). The tier drives BOTH the legacy quality params
+// (settings.quality: resolution scale, bloom, shadows) and the v8 gfx detail params. Saved settings migrate to one tier.
+const GFX_Q={low:'low',med:'medium',high:'high'};
+function gfxMigrate(s){s=s||settings;const q2t={low:'low',medium:'med',med:'med',high:'high'};let t=/^(low|med|high)$/.test(s.gfx)?s.gfx:null;
+ if(!t&&s.quality&&q2t[s.quality])t=q2t[s.quality];/* old-only save: keep the user's quality choice */ if(!t)t='med';s.gfx=t;s.quality=GFX_Q[t];return t}
+{const qp=new URLSearchParams(location.search).get('q');const had=JSON.stringify([settings.gfx,settings.quality]);if(qp&&!new URLSearchParams(location.search).get('gfx')){settings.gfx=null;settings.quality=qp}
+ gfxMigrate(settings);let sv={};try{sv=JSON.parse(localStorage.getItem('twofold')||'{}')||{}}catch(e){}if(!qp&&(sv.gfx!==settings.gfx||sv.quality!==settings.quality))try{saveSettings()}catch(e){}try{applyQuality()}catch(e){}}
+{const _sg=setGfx;setGfx=function(t){if(/^(low|med|high)$/.test(t))settings.quality=GFX_Q[t];return _sg(t)}}
+// account sync: a profile with only an old 'quality' (or mismatched pair) is normalised the same way after it loads
+{const _sy=typeof syncGfx==='function'?syncGfx:null;syncGfx=function(){gfxMigrate(settings);if(_sy)_sy.apply(this,arguments);try{syncGfxSel()}catch(e){}}}
+window.__gfxMigrate=gfxMigrate;
+if(typeof syncAllSettings==='function'){const _sa=syncAllSettings;syncAllSettings=function(){const r=_sa.apply(this,arguments);try{const t0=settings.gfx;gfxMigrate(settings);syncGfxSel();applyQuality()}catch(e){}return r}}

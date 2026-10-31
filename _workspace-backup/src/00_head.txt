@@ -1,0 +1,342 @@
+<!doctype html>
+<html><head><link rel=icon href="data:,"><meta charset="utf-8"><title>TWOFOLD - 2v2 Arena</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#0a0b10;font-family:system-ui,"Segoe UI",Arial,sans-serif;color:#eee;user-select:none}
+canvas{display:block}
+.scr{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;background:radial-gradient(circle at 50% 40%,#1c2433 0,#07080c 75%);z-index:20}
+.dim{background:rgba(5,6,10,.82)}
+.hide{display:none!important}
+h1{font-size:72px;letter-spacing:10px;margin:0;color:#fff;text-shadow:0 0 22px #2d8cff,5px 5px 0 #ff8a1e}
+h2{margin:6px 0 14px}
+.sub{color:#9ab;margin:6px 0 26px;letter-spacing:2px}
+button{background:#1a2433;color:#fff;border:2px solid #3a7bd5;padding:10px 22px;margin:5px;font-size:17px;border-radius:6px;cursor:pointer;min-width:250px}
+button:hover{background:#28395a}button.sm{min-width:0;padding:6px 12px;font-size:14px}
+input,select{background:#0f1720;color:#fff;border:1px solid #456;padding:8px;font-size:17px;border-radius:4px}
+.row{display:flex;gap:8px;align-items:center;margin:6px}
+.msg{color:#fb6;min-height:22px;margin-top:8px}
+#lobbyTeams{display:flex;gap:30px;margin:10px}
+.team{width:250px;padding:12px;border-radius:8px;background:#121a26}
+.t0{border:2px solid #2d8cff}.t1{border:2px solid #ff8a1e}
+.slot{padding:8px;margin:5px 0;background:#0b1119;border-radius:4px}
+.you{outline:2px solid #fff}
+.code{font-size:44px;letter-spacing:10px;font-weight:bold;color:#7fd0ff}
+#hud{position:fixed;inset:0;pointer-events:none;z-index:5}
+#xh{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none}
+.vc .vimg{width:100%;height:92px;object-fit:contain;background:radial-gradient(#25405e,#0a121c);border-radius:4px;display:block;margin:4px 0}
+.vc .simg{width:78px;height:36px;object-fit:contain;vertical-align:middle;background:#0c1622;border-radius:3px;margin-right:6px}
+.xhp{width:22px;height:22px;min-width:0;padding:0;margin:0 2px;border-radius:4px;border:2px solid #fff3}
+#hm{position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px;opacity:0}
+#hm:before,#hm:after{content:"";position:absolute;left:12px;top:0;width:2px;height:26px;background:#fff}
+#hm:before{transform:rotate(45deg)}#hm:after{transform:rotate(-45deg)}
+#hm.hs:before,#hm.hs:after{background:#ff3b3b}
+#dmgind{position:absolute;left:50%;top:50%}
+.di{position:absolute;width:0;height:0;left:-30px;top:-130px;border-left:30px solid transparent;border-right:30px solid transparent;border-bottom:26px solid rgba(255,40,40,.85);transform-origin:30px 130px}
+#hpbox{position:absolute;left:24px;bottom:24px;width:260px}
+#hpbar{height:14px;background:#300;border:1px solid #000}#hpfill{height:100%;background:#4f4;width:100%}
+#ammo{position:absolute;right:28px;bottom:22px;text-align:right;text-shadow:0 0 4px #000}
+#ammo .big{font-size:42px;font-weight:bold}
+#score{position:absolute;left:50%;top:10px;transform:translateX(-50%);display:flex;font-weight:bold;font-size:24px;text-shadow:0 0 4px #000}
+#score .b{background:rgba(45,140,255,.85);padding:6px 16px}#score .o{background:rgba(255,138,30,.85);padding:6px 16px}
+#score .tm{background:rgba(0,0,0,.6);padding:6px 16px;min-width:56px;text-align:center}
+#alive{position:absolute;left:50%;top:52px;transform:translateX(-50%);font-size:14px}
+#kf{position:absolute;right:16px;top:14px;text-align:right;font-size:15px}
+#kf div{background:rgba(0,0,0,.55);padding:4px 10px;margin:3px 0;border-radius:3px}
+#banner{position:absolute;left:0;right:0;top:24%;text-align:center;font-size:46px;font-weight:bold;text-shadow:0 0 10px #000}
+#loadout{position:absolute;left:50%;top:38%;transform:translateX(-50%);background:rgba(8,12,20,.85);padding:14px 26px;border-radius:8px;text-align:center;border:1px solid #3a7bd5}
+#loadout b{color:#7fd0ff}
+#sb{position:absolute;left:50%;top:18%;transform:translateX(-50%);background:rgba(6,8,14,.9);padding:16px;border-radius:8px;min-width:520px}
+#sb table{width:100%;border-collapse:collapse}#sb td,#sb th{padding:6px 10px;text-align:left}
+#flash{position:absolute;inset:0;background:#fff;opacity:0}
+#scope{position:absolute;inset:0;background:radial-gradient(circle,transparent 0,transparent 33vh,#000 33.3vh)}
+#scope:before{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:#000}
+#scope:after{content:"";position:absolute;top:50%;left:0;right:0;height:1px;background:#000}
+#flagbar{position:absolute;left:50%;top:84px;transform:translateX(-50%);font-size:15px;text-align:center}
+#flagbar .bar{width:200px;height:8px;background:#222;margin-top:3px}#flagbar .fill{height:100%;width:0}
+#hint{position:absolute;left:50%;bottom:90px;transform:translateX(-50%);color:#ccc;font-size:15px;text-shadow:0 0 3px #000}
+#util{position:absolute;right:28px;bottom:118px;text-align:right;font-size:15px}
+#cook{position:absolute;left:50%;top:56%;transform:translateX(-50%);color:#fc6}
+#pickMsg{position:absolute;left:50%;top:59.5%;transform:translateX(-50%);font-size:12px;color:#dfe8f0;opacity:0;transition:opacity .25s;pointer-events:none;text-shadow:0 1px 2px #000;letter-spacing:.5px}#pickMsg.on{opacity:.7;transition:none}
+#hm.kill{width:34px;height:34px;margin:-17px}#hm.kill:before,#hm.kill:after{left:16px;height:34px;width:3px}
+#ret{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+#ret.dot{width:6px;height:6px;border-radius:50%;background:#ff2a2a;box-shadow:0 0 6px #f00}
+#ret.holo{width:30px;height:30px;border-radius:50%;border:2px solid rgba(255,60,60,.9);box-shadow:0 0 6px #f00}
+#ret.holo:after{content:"";position:absolute;left:12px;top:12px;width:3px;height:3px;border-radius:50%;background:#ff3a3a}
+#scope .mil{position:absolute;left:50%;top:50%;width:66vh;height:2px;margin-left:-33vh;background:repeating-linear-gradient(90deg,transparent 0 calc(6.6vh - 3px),#000 calc(6.6vh - 3px) 6.6vh)}
+#scope .ring{position:absolute;left:50%;top:50%;width:66vh;height:66vh;margin:-33vh;border-radius:50%;box-shadow:inset 0 0 6vh 2vh rgba(0,0,0,.85)}
+#breath{position:absolute;left:50%;top:calc(50% + 36vh);transform:translateX(-50%);font-size:13px;color:#ddd;text-align:center}
+#spec{position:absolute;left:50%;bottom:140px;transform:translateX(-50%);background:rgba(0,0,0,.6);padding:6px 18px;border-radius:4px;font-size:18px;text-align:center}
+#recap{position:absolute;left:24px;top:22%;width:360px;background:rgba(8,12,20,.92);border:1px solid #c44;border-radius:8px;padding:12px 14px;font-size:14px}
+#recap h3{margin:0 0 6px;font-size:16px;color:#f88}#recap table{width:100%;border-collapse:collapse}#recap td{padding:2px 4px}#recap .sec{color:#9ab;margin-top:8px;font-size:12px;letter-spacing:1px}
+#vote{position:absolute;left:50%;top:13%;transform:translateX(-50%);text-align:center;pointer-events:auto}
+#vote .cards{display:flex;gap:14px;margin-top:8px}
+.vc{width:280px;min-width:0;text-align:left;background:rgba(10,16,26,.92);border:2px solid #3a5a85;padding:12px;font-size:14px}
+.vc.mine{border-color:#fff;box-shadow:0 0 12px #7fd0ff}.vc.win{border-color:#7f7}
+.vc .vp{font-size:20px;font-weight:bold;color:#7fd0ff}.vc .vs{color:#bcd;margin:2px 0}.vc .vsec{margin-top:6px}.vc .vsec span{color:#9ab}.vc .vk{float:right;color:#9ab}
+.vc .vcnt{margin-top:8px;font-size:18px;min-height:22px}
+#floats .fn .fpen{font-size:12px;color:#ffcf6a}.wpen{font-size:12px;color:#ffcf6a;margin-left:6px}.spinb{display:inline-block;width:70px;height:6px;background:#0008;border:1px solid #fff4;margin-left:8px;vertical-align:middle}.spinb i{display:block;height:100%;background:linear-gradient(90deg,#ffb347,#ff5a2a)}
+#floats .fn{position:absolute;font-weight:bold;font-size:18px;text-shadow:0 0 3px #000,0 0 2px #000;transform:translate(-50%,-50%)}
+#chat{position:absolute;left:24px;bottom:120px;width:420px;font-size:15px;text-shadow:0 0 3px #000,0 0 2px #000;pointer-events:none}
+#chat .cl{background:rgba(0,0,0,.35);padding:2px 8px;margin:2px 0;border-radius:3px;transition:opacity .6s}
+#chatIn,#lchatIn{width:100%;box-sizing:border-box;font-size:15px;padding:6px;pointer-events:auto}
+#chatBox{position:absolute;left:24px;bottom:84px;width:420px;pointer-events:auto}
+#chatMode{font-size:12px;color:#fb6;margin-bottom:2px}
+#lchat{width:520px;height:110px;overflow-y:auto;background:#0b1119;border:1px solid #234;border-radius:6px;padding:6px;font-size:14px;margin:6px}
+#talk{position:absolute;left:24px;top:30%;font-size:14px}
+#talk div{background:rgba(0,0,0,.5);padding:3px 8px;margin:2px 0;border-radius:3px}
+#emp{position:absolute;inset:0;opacity:0;background:repeating-linear-gradient(0deg,rgba(120,200,255,.08) 0 2px,transparent 2px 5px);mix-blend-mode:screen}
+#vign{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle,transparent 55%,rgba(150,0,0,.55) 100%);opacity:0}
+.kbt{width:100%;border-collapse:collapse;font-size:14px}.kbt td{padding:3px 8px}.kbt button{min-width:140px;margin:1px;padding:4px 8px;font-size:14px}
+.kbt button.conf{border-color:#f44;background:#3a1414}.kbt button.wait{border-color:#fb6;background:#3a2c10}
+#lset{background:#121a26;border:1px solid #345;border-radius:8px;padding:8px 14px;margin:6px;font-size:15px}
+.slot .bb{min-width:0;padding:2px 8px;font-size:12px;margin:0 0 0 8px;float:right}
+.vc .vthumb{width:100%;height:110px;object-fit:cover;border-radius:4px;display:block;margin:4px 0}
+#mvote{position:absolute;left:50%;top:22%;transform:translateX(-50%);text-align:center;pointer-events:auto}.mvh{font-size:26px;font-weight:bold;text-shadow:0 0 6px #000;margin-bottom:10px}.mvr{display:flex;gap:12px}.mvc{width:200px;padding:12px;background:rgba(10,16,24,.85);color:#fff;border:2px solid #345;border-radius:8px;cursor:pointer;font:inherit}.mvc.mine{border-color:#4f8}.mvn{font-size:12px;margin-top:6px;min-height:16px}
+
+.glass{background:rgba(12,18,28,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(140,180,230,.18);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.35)}
+#hud{font-family:"Segoe UI",system-ui,sans-serif;letter-spacing:.3px}
+
+#hpbox{position:static;width:auto}.hprow{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}.hpl{font-size:11px;color:#9ab;font-weight:600}#hpTxt{font-size:24px;font-weight:700}
+#hpbar{height:8px;background:rgba(255,255,255,.08);border:0;border-radius:4px;overflow:hidden}#hpfill{border-radius:4px;transition:width .15s}
+#wslots{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.ws{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:7px;opacity:.45;transition:all .15s;border:1px solid transparent}
+.ws.on{opacity:1;background:rgba(80,150,255,.16);border-color:rgba(120,180,255,.45);transform:translateX(-4px)}
+#wslots{margin:0 0 8px;width:280px;text-align:left}#ammo #wName{font-size:13px;color:#cde}
+#vign{position:absolute;inset:0;pointer-events:none;opacity:0}#dmgarc{position:absolute;inset:0;pointer-events:none}.da{position:absolute;left:0;top:0;width:240px;height:240px;margin:-120px;border-radius:50%;border-top:10px solid rgba(255,40,30,.9);filter:blur(1px)}
+.ws img{width:78px;height:30px;object-fit:contain}.ws .wk{font-size:11px;color:#9ab;min-width:30px;text-align:center;border:1px solid #456;border-radius:4px;padding:1px 3px}
+.ws .wn{font-size:13px;font-weight:600;flex:1}.ws .wc{font-size:12px;color:#cde}
+#util{display:none}
+#ammo{right:24px;bottom:20px;padding:10px 16px}#ammo .big{font-size:38px;font-weight:700}
+#pause{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(4,8,14,.45)}#pause.hide{display:none}
+.pwrap{display:flex;width:820px;height:500px;overflow:hidden;color:#e8eef6}
+.pnav{width:200px;display:flex;flex-direction:column;gap:6px;padding:18px;background:rgba(0,0,0,.25)}
+.ptitle{font-size:22px;font-weight:800;letter-spacing:4px;margin-bottom:14px}.ptitle span{display:block;font-size:11px;letter-spacing:3px;color:#7fd0ff}
+.pn{text-align:left;background:transparent;border:1px solid transparent;color:#cfe;padding:9px 12px;border-radius:8px;font-size:15px;cursor:pointer;margin:0;width:auto}
+.pn:hover{background:rgba(255,255,255,.06)}.pn.on{background:rgba(80,150,255,.2);border-color:rgba(120,180,255,.5)}.pn.danger{color:#ff8a8a}
+.pbody{flex:1;padding:20px 24px;overflow-y:auto}.ppage.hide,.ptab.hide{display:none}
+.ptabs{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap}.pt{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#cde;padding:6px 12px;border-radius:16px;font-size:13px;cursor:pointer;margin:0;width:auto}.pt.on{background:#2d6cdf;border-color:#5a9aff;color:#fff}
+.prow{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:14px}.prow span{flex:1}
+#pSb table{width:100%;border-collapse:collapse}#pSb td,#pSb th{padding:5px 8px;text-align:left}
+
+/* compact weapon panel v5.1 */
+#ammo{right:12px!important;bottom:10px!important;padding:0!important;background:none!important;border:none!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+#ammo .big{font-size:24px!important;line-height:1}#ammo #wName{font-size:10px!important;opacity:.8}
+#wslots{width:auto!important;margin:0 0 4px!important;display:flex!important;flex-direction:row!important;flex-wrap:wrap;justify-content:flex-end;gap:3px 6px!important}
+.ws{padding:0!important;gap:4px!important;opacity:.5;border:none!important;background:none!important;transform:none!important;transition:opacity .4s}
+.ws img{width:30px!important;height:12px!important}.ws .wk{font-size:8px!important;min-width:0!important;padding:0 2px!important;border-color:#345!important}
+.ws .wn,.ws .wc{display:none}
+.ws.on{order:9;flex-basis:100%;justify-content:flex-end;opacity:1}.ws.on img{width:46px!important;height:18px!important}
+.ws.on .wn{display:inline;font-size:11px;flex:none}.ws.on .wc{display:none}
+#wslots.idle .ws:not(.on){opacity:0}
+#ammo{transform:scale(1.15);transform-origin:100% 100%}
+#stamBar{position:fixed;left:50%;bottom:34px;width:180px;height:4px;margin-left:-90px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden;transition:opacity .6s;opacity:.9}#stamBar.full{opacity:0}#stamBar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#7fd0ff,#e8f6ff);border-radius:3px}#stamBar.low i{background:#ff8a5a}#stamBar.tac i{background:linear-gradient(90deg,#ffd76a,#fff3c4)}
+#tkPrompt{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);padding:8px 16px;border-radius:10px;background:rgba(10,20,34,.6);border:1px solid rgba(120,180,255,.4);color:#dff;font:14px system-ui}
+
+/* v6 main menu */
+#menuBg{position:fixed;inset:0;width:100%;height:100%;z-index:19;display:block}
+#menu.m6{background:radial-gradient(circle at 50% 40%,rgba(10,14,24,.15) 0,rgba(4,6,10,.65) 80%)}
+.mwrap{display:flex;width:min(1080px,94vw);height:min(660px,90vh);overflow:hidden;color:#e8eef6}
+.mwrap .pnav{width:230px}.mn{text-align:left;background:transparent;border:1px solid transparent;color:#cfe;padding:10px 12px;border-radius:8px;font-size:15px;cursor:pointer;margin:0;width:auto}.mn:hover{background:rgba(255,255,255,.06)}.mn.on{background:rgba(80,150,255,.2);border-color:rgba(120,180,255,.5)}
+.mpage.hide{display:none}.mpage h3{margin:0 0 4px;font-size:22px}.mpage .sub{color:#9ab;font-size:13px;margin-bottom:12px}
+.mpage .prow input[type=range]{width:180px}.mpage .prow b{min-width:44px}
+.playbtns{display:flex;gap:10px;margin:14px 0}.playbtns button{flex:1;margin:0}
+.accp{border:1px solid rgba(140,180,230,.25);border-radius:10px;padding:10px;background:rgba(0,0,0,.25);font-size:13px;cursor:pointer}.accp:hover{border-color:#7fd0ff}.accp .an{font-weight:700;font-size:15px}.accp .am{color:#ffd76a}.accp .st{color:#9ab;font-size:11px}
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}.scard{border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:8px;background:rgba(0,0,0,.25);position:relative;cursor:pointer}.scard img{width:100%;height:76px;object-fit:contain}.scard .sn{font-weight:700;font-size:14px}.scard .sg{font-size:11px;color:#9ab}.scard.lock{opacity:.45}.scard.eq{box-shadow:0 0 0 2px #7fd0ff inset}.scard .rb{position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:10px 0 0 10px}.scard .tag{position:absolute;right:8px;top:6px;font-size:10px;padding:1px 6px;border-radius:8px;background:#2d6cdf}
+.pbody{scrollbar-width:thin;scrollbar-color:#6a7f99 rgba(255,255,255,.06);overscroll-behavior:contain}.pbody::-webkit-scrollbar{width:10px}.pbody::-webkit-scrollbar-thumb{background:#6a7f99;border-radius:6px}.pbody::-webkit-scrollbar-track{background:rgba(255,255,255,.06)}
+.cgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.crate{border-radius:12px;padding:12px;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.12)}.crate h4{margin:0;font-size:18px}.crate .th{font-size:12px;color:#9ab}.cbox{height:90px;border-radius:10px;margin:8px 0;display:flex;align-items:center;justify-content:center;font-size:40px}.odds{font-size:12px;margin:6px 0}.odds div{display:flex;justify-content:space-between}.cskins{display:flex;flex-wrap:wrap;gap:3px;margin:6px 0}.cskins img{width:52px;height:22px;object-fit:contain;background:rgba(255,255,255,.04);border-radius:4px;border-bottom:2px solid}.crate button{width:100%;margin:4px 0 0}
+#reel{position:fixed;inset:0;z-index:40;background:rgba(2,4,8,.8);display:flex;align-items:center;justify-content:center}#reel.hide{display:none}.rwin{width:min(900px,94vw);text-align:center;color:#eef}.rtitle{font-size:22px;font-weight:800;letter-spacing:3px;margin-bottom:10px}
+.rstrip{position:relative;height:130px;overflow:hidden;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12)}#reelTrack{display:flex;position:absolute;left:0;top:10px;will-change:transform}.ri{width:150px;height:110px;margin:0 3px;flex:none;border-radius:8px;background:rgba(0,0,0,.4);border-bottom:4px solid;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px}.ri img{width:130px;height:56px;object-fit:contain}
+.rline{position:absolute;left:50%;top:0;bottom:0;width:3px;margin-left:-1px;background:#ffd76a;z-index:2;box-shadow:0 0 12px #ffd76a}#reelRes{min-height:120px;margin:14px 0}#reelRes .big{font-size:26px;font-weight:800}#reelRes img{height:90px}
+.stbl{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0 14px}.stbl th,.stbl td{padding:4px 8px;text-align:left;border-bottom:1px solid rgba(255,255,255,.06)}.stbl th{color:#9ab;cursor:pointer;user-select:none}.stbl th.sorted{color:#7fd0ff}.w{color:#7f7}.l{color:#f77}
+.sumrow{display:flex;gap:10px;margin-bottom:10px}.sum{flex:1;background:rgba(0,0,0,.25);border-radius:10px;padding:8px 10px}.sum b{display:block;font-size:20px}.sum span{font-size:11px;color:#9ab}
+.accform input{width:100%;margin:4px 0;box-sizing:border-box}.accform{max-width:380px}.accmsg{color:#ffd76a;font-size:13px;margin:8px 0;min-height:18px}
+#mmBox{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:60;padding:26px 40px;border-radius:14px;text-align:center;min-width:340px;background:rgba(14,22,34,.94);border:1px solid #3a6ea5}
+#mmTitle{font-size:22px;font-weight:bold;margin:10px 0 6px}#mmCancel{margin-top:14px}
+.mmspin{width:42px;height:42px;margin:0 auto;border-radius:50%;border:4px solid #234;border-top-color:#59c3ff;animation:mmsp 1s linear infinite}@keyframes mmsp{to{transform:rotate(360deg)}}
+.qpbtn{background:linear-gradient(180deg,#2f8cff,#1c5fc0)!important;color:#fff!important;font-weight:bold}
+.devtag{display:inline-block;margin-left:5px;padding:0;border:0;background:none;box-shadow:none;font-weight:900;font-size:1.05em;letter-spacing:.04em;line-height:1;color:#ff3b3b;text-shadow:0 1px 2px rgba(0,0,0,.85),0 0 1px #000;color:var(--dvc,#ff3b3b)}
+@keyframes devrb{0%{color:#ff3b3b}16%{color:#ff9f1a}33%{color:#ffe83a}50%{color:#3bff6a}66%{color:#2ad8ff}83%{color:#b45bff}100%{color:#ff3b3b}}
+#minimap{position:absolute;left:14px;top:14px;width:176px;height:176px;border-radius:50%;box-shadow:0 4px 14px #0008;pointer-events:none}
+.qpend .qpc{width:230px}.qpend .qpc b{font-size:20px}
+.backlobby .vk{display:inline;margin-right:6px;color:#fb6}
+.ldtabs{margin-bottom:10px}.ldtabs .pt{font-size:14px;padding:7px 16px}
+.ldwrap{display:flex;gap:16px;align-items:flex-start}.ldgrid{flex:1;display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}.ldgrid .scard{padding:4px;text-align:center;cursor:pointer}.ldgrid .scard.sel{outline:2px solid #5a9aff}
+#ldvBox{width:300px;flex:none;background:rgba(10,16,24,.6);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px;text-align:center}#ldvCv{width:280px;height:340px;display:block;margin:0 auto;cursor:grab;background:radial-gradient(circle at 50% 60%,#1d2a3a,#0b1018 70%);border-radius:8px}#ldvInfo .skvn{font-size:18px;font-weight:bold;margin-top:6px}#ldvEquip{margin-top:8px}
+.backlobby{display:block;margin:12px auto 0;padding:8px 18px;background:#1d2a3a;border:1px solid #5a7fa5;color:#dfefff;border-radius:8px;cursor:pointer}
+#vote .vc.v2{width:250px;text-align:left;padding:10px 12px;position:relative;transition:transform .12s,box-shadow .12s}
+#vote .vc.v2:hover{transform:translateY(-3px)}#vote .vc.v2.lead{box-shadow:0 0 0 2px #ffd24a,0 0 18px #ffd24a66}
+#vote .vc.v2 .vlead{display:none;position:absolute;right:10px;top:8px;font-size:11px;font-weight:900;color:#ffd24a;letter-spacing:1px}#vote .vc.v2.lead .vlead{display:block}
+#vote .vc.v2 .vk{display:inline-block;background:#fff2;border-radius:4px;padding:0 6px;font-weight:bold}.vcls{color:#9ab;font-size:12px;margin-bottom:4px}
+.vbars{margin:6px 0}.vbr{display:flex;align-items:center;gap:6px;font-size:11px;margin:3px 0}.vbr span{width:62px;color:#9ab;letter-spacing:.5px}.vbr i{flex:1;height:7px;background:#ffffff14;border-radius:4px;overflow:hidden}
+.vbr i b{display:block;height:100%;background:linear-gradient(90deg,#3aa0ff,#7fe0ff);border-radius:4px}.vbr em{width:66px;text-align:right;font-style:normal;color:#dfe8f0}
+#vote .vc.v2 .vsec{display:flex;gap:8px;align-items:center;border-top:1px solid #ffffff18;padding-top:5px;margin-top:5px;font-size:12px}#vote .vc.v2 .vsec span{display:block;color:#9ab;font-size:11px}
+.vchip{display:inline-block;border:1.5px solid;border-radius:10px;padding:0 7px;margin:2px 3px 0 0;font-size:11px;background:#0006}.vnone{color:#678;font-size:11px}
+#vtBar{height:5px;width:520px;max-width:80vw;margin:6px auto 2px;background:#ffffff1a;border-radius:3px;overflow:hidden}#vtBar b{display:block;height:100%;background:#fb6;transition:width .12s linear}
+.cbox.hasimg{display:flex;align-items:center;justify-content:center}.cimg{width:150px;height:112px}.fimg{width:26px;height:20px;vertical-align:middle;margin-right:4px}
+#skv{position:fixed;inset:0;z-index:70;background:rgba(3,6,12,.72);display:flex;align-items:center;justify-content:center}#skv.hide{display:none}
+.skvw{display:flex;gap:16px;padding:18px;border-radius:14px;background:rgba(14,22,34,.96);border:1px solid #3a6ea5}#skvCv{width:640px;height:400px;max-width:62vw;border-radius:10px;background:radial-gradient(circle at 50% 45%,#2a3a52,#0b1018);cursor:grab;touch-action:none}
+.skvside{width:230px;display:flex;flex-direction:column;gap:10px}.skvn{font-size:22px;font-weight:bold}
+</style>
+<script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/geometries/RoundedBoxGeometry.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/environments/RoomEnvironment.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head><body>
+<canvas id="menuBg"></canvas>
+<div id="menu" class="scr m6">
+<div class="mwrap glass">
+ <div class="pnav"><div class="ptitle">TWOFOLD<span>2V2 ROUND ARENA &middot; <span class="appVer">v8.1</span></span></div>
+  <button class="mn on" data-m="mPlay">Play</button><button class="mn" data-m="mLoad">Loadout &amp; Skins</button><button class="mn" data-m="mCrates">Crates</button><button class="mn" data-m="mStats">Stats &amp; Leaderboard</button><button class="mn" data-m="mSet">Settings</button>
+  <div style="flex:1"></div>
+  <div id="accPanel" class="accp" title="Account"></div>
+ </div>
+ <div class="pbody">
+  <div class="mpage" id="mPlay"><h3>Play</h3><div class="sub">Same loadout for everyone. Best team wins.</div>
+   <div class="prow"><span>Name</span><input id="nameIn" maxlength="16"><span id="nameNote" class="hide" style="margin-left:4px"></span></div>
+   <div class="prow"><span>Bot difficulty</span><select id="diffSel"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select></div>
+   <div class="playbtns"><button id="bQuick" class="qpbtn">Quick Play</button><button id="bPractice">Practice vs Bots</button><button id="bHost">Host Online Match</button></div>
+   <div class="prow"><span>Join a friend</span><input id="codeIn" maxlength="5" placeholder="CODE" style="width:110px;text-transform:uppercase;letter-spacing:4px"><button id="bJoin" class="sm">Join</button></div>
+ <button class="sm" id="bRelay">Relay server (for friends far away)...</button>
+ <div id="relayBox" class="hide" style="background:#111a26;border:1px solid #345;border-radius:8px;padding:10px 14px;max-width:560px;font-size:14px">
+  <div style="color:#9ab;margin-bottom:6px">If a friend can't connect (strict NAT/firewall), set up a free TURN relay. Host AND the struggling friend should both paste the same settings.</div>
+  <div class="row"><span>Mode</span><select id="rMode"><option value="off">Off (direct only)</option><option value="metered">Metered.ca free (app name + API key)</option><option value="manual">Manual TURN server</option></select></div>
+  <div id="rMet"><div class="row"><span>App name</span><input id="rApp" placeholder="yourapp (from yourapp.metered.live)" style="width:280px"></div><div class="row"><span>API key</span><input id="rKey" style="width:280px"></div></div>
+  <div id="rMan"><div class="row"><span>TURN URL(s)</span><input id="rUrl" placeholder="turns:host:443?transport=tcp, turn:host:3478" style="width:300px"></div><div class="row"><span>Username</span><input id="rUser" style="width:200px"></div><div class="row"><span>Credential</span><input id="rCred" style="width:200px"></div></div>
+  <div class="row"><button class="sm" id="rSave">Save</button><button class="sm" id="rTest">Test relay</button><span id="rStat" style="color:#fb6"></span></div>
+ </div>
+   <div class="msg" id="menuMsg"></div>
+ <div style="color:#789;font-size:13px;margin-top:14px;text-align:left">All controls can be rebound under Keybinds. Defaults: WASD move &middot; Mouse look &middot; Shift sprint &middot; Space jump &middot; C crouch &middot; LMB fire &middot; RMB aim &middot; R reload &middot; 1/2 swap &middot; G hold to cook / release to throw &middot; Tab scoreboard &middot; Esc pause<br>Vote loadouts with 1/2/3 &middot; Hold Shift while scoped to steady &middot; F melee &middot; V push-to-talk &middot; Enter chat (Y team chat) &middot; Dead: click/Space to cycle spectate, X free camera</div>
+  </div>
+  <div class="mpage hide" id="mLoad"><h3>Loadout &amp; Skins</h3><div class="sub">Equip skins you own. Skins show on your viewmodel, your third-person model, HUD icons, and to everyone in online matches.</div><div id="skinFilter" class="ptabs"></div><div id="skinGrid" class="sgrid"></div></div>
+  <div class="mpage hide" id="mCrates"><h3>Crates</h3><div class="sub">Buy a key with match money, then open its crate. Rolls happen on the server.</div><div id="crateGrid" class="cgrid"></div></div>
+  <div class="mpage hide" id="mStats"><h3>Stats &amp; Leaderboard</h3><div id="statsBody"></div></div>
+  <div class="mpage hide" id="mSet"><h3>Settings</h3>
+   <div class="prow"><span>Mouse sensitivity</span><input id="sensIn" type="range" min="0.2" max="3" step="0.05"><b id="sensV"></b></div>
+   <div class="prow"><span>Master volume</span><input id="volIn" type="range" min="0" max="1" step="0.05"><b id="volV"></b></div>
+   <div class="prow"><span>Music volume</span><input class="musVol" type="range" min="0" max="1" step="0.05"><b class="musV"></b><label><input type="checkbox" class="musMute"> Mute music</label></div>
+   <div class="prow"><span>Damage numbers</span><input type="checkbox" id="dnIn"></div>
+   <div class="prow"><span>Display</span><button class="sm fsBtn">Enter fullscreen</button><label><input type="checkbox" class="mmIn"> Minimap</label><label title="Go fullscreen on your first click or key press"><input type="checkbox" class="fsDefIn"> Start in fullscreen</label></div>
+   <div class="prow"><span>Graphics</span><select class="gfxSel"><option value="low">Low</option><option value="med">Med</option><option value="high">High</option></select></div><div class="prow"><label><input type="checkbox" class="goreIn"> Blood effects</label></div>
+   <div class="prow"><span>Voice</span><label><input type="checkbox" class="omIn"> Open mic</label><span style="flex:none">Mic</span><input class="micVol" type="range" min="0" max="2" step="0.05" style="width:90px"><span style="flex:none">Voices</span><input class="vcVol" type="range" min="0" max="1.5" step="0.05" style="width:90px"></div>
+   <div class="prow"><span>Controls</span><button class="sm" id="bXh">Crosshair...</button><button class="sm" id="bKeys">Keybinds...</button></div>
+   <div class="sub" id="setSync"></div>
+  </div>
+  <div class="mpage hide" id="mAcc"><h3>Account</h3><div id="accBody"></div></div>
+ </div>
+</div>
+</div>
+<div id="reel" class="hide"><div class="rwin"><div class="rtitle" id="reelTitle"></div><div class="rstrip"><div class="rline"></div><div id="reelTrack"></div></div><div id="reelRes"></div><button class="sm" id="reelSkip" style="visibility:hidden;margin-right:8px" onclick="reelSkip()">Skip &#9193; (Space)</button><button class="sm" id="reelClose">Collect</button></div></div>
+<div id="mmBox" class="hide glass"><div class="mmspin"></div><div id="mmTitle">Searching for players...</div><div id="mmSub" class="sub"></div><button id="mmCancel">Cancel</button></div>
+<div id="skv" class="hide"><div class="skvw glass"><canvas id="skvCv"></canvas><div class="skvside"><div id="skvInfo"></div><div class="row"><button class="sm" id="skvIn">Zoom +</button><button class="sm" id="skvOut">Zoom -</button><button class="sm" id="skvReset">Reset</button></div><button id="skvEquip">Equip</button><button id="skvClose">Close</button></div></div></div>
+<div id="pracSetup" class="scr hide">
+ <h2>PRACTICE VS BOTS</h2>
+ <div style="text-align:center;color:#7fd0ff;font-size:18px">OFFLINE - you and three bots</div>
+ <div id="pracTeams" style="display:flex;gap:30px;margin:10px"><div class="team t0"><b style="color:#2d8cff">BLUE</b><div id="pt0"></div></div><div class="team t1"><b style="color:#ff8a1e">ORANGE</b><div id="pt1"></div></div></div>
+ <div class="row"><span>Map</span><select id="pMap"></select></div>
+ <div class="row"><span>Bot difficulty</span><select id="pDiff"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select></div>
+ <div class="row"><button id="bPStart">Start Match</button></div>
+ <button id="bPBack">Back</button>
+</div>
+<div id="lobby" class="scr hide">
+ <h2>LOBBY</h2>
+ <div id="lqp" class="hide" style="text-align:center;color:#7fd0ff;font-size:18px">QUICK PLAY - empty slots are filled by bots</div><div id="codeBox"><div style="text-align:center;color:#9ab">Room code</div><div class="row"><span class="code" id="codeTxt">-----</span><button class="sm" id="bCopy">Copy</button></div></div>
+ <div id="lobbyTeams"><div class="team t0"><b style="color:#2d8cff">BLUE</b><div id="lt0"></div></div><div class="team t1"><b style="color:#ff8a1e">ORANGE</b><div id="lt1"></div></div></div>
+ <div style="color:#9ab;font-size:14px">Host: add or remove bots per slot (any mix: 1v1, 1v2, 2v2, players only...).</div>
+ <div id="lset"><div class="row"><span>Map</span><select id="lMap"></select><span id="lMapTxt" style="color:#7fd0ff;font-weight:bold"></span></div>
+  <div class="row"><label><input type="checkbox" id="lFF"> Friendly fire (team kills)</label><span id="lFFTxt" style="color:#9ab"></span></div></div>
+ <div id="lchat"></div><div class="row" style="width:520px"><input id="lchatIn" maxlength="120" placeholder="Lobby chat - press Enter to send"></div>
+ <div class="row"><button id="bSwitch">Switch Team</button><button id="bStart">Start Match</button></div>
+ <button id="bLeave">Leave</button>
+ <div class="msg" id="lobbyMsg"></div>
+</div>
+<div id="pause" class="hide"><div class="pwrap glass">
+ <div class="pnav"><div class="ptitle">TWOFOLD<span>PAUSED</span></div>
+  <button class="pn on" data-p="pHome" id="bResume">Resume</button><button class="pn" data-p="pSet">Settings</button><button class="pn" data-p="pScore">Scoreboard</button><div style="flex:1"></div><button class="pn danger" id="bQuit">Leave Match</button></div>
+ <div class="pbody">
+  <div class="ppage" id="pHome"><h3>Match paused</h3><div class="sub">The match keeps running for everyone else. Click Resume (or press it again) to recapture the mouse.</div><div id="pInfo"></div></div>
+  <div class="ppage hide" id="pSet"><div class="ptabs"><button class="pt on" data-t="tGame">Game</button><button class="pt" data-t="tGfx">Graphics</button><button class="pt" data-t="tAud">Audio</button><button class="pt" data-t="tXh">Crosshair</button><button class="pt" data-t="tKb">Keybinds</button><button class="pt" data-t="tVc">Voice</button></div>
+   <div class="ptab" id="tGame"><div class="prow"><span>Mouse sensitivity</span><input id="sensIn2" type="range" min="0.2" max="3" step="0.05"><b id="sensV2"></b></div><div class="prow"><span>Damage numbers</span><input type="checkbox" id="dnIn2"></div><div class="prow"><span>Invert scroll-wheel weapon switch</span><input type="checkbox" class="invScr"></div></div>
+   <div class="ptab hide" id="tGfx"><div class="prow"><span>Display</span><button class="sm fsBtn">Enter fullscreen</button><label><input type="checkbox" class="mmIn"> Minimap</label><label title="Go fullscreen on your first click or key press"><input type="checkbox" class="fsDefIn"> Start in fullscreen</label></div><div class="prow"><span>Graphics</span><select class="gfxSel"><option value="low">Low</option><option value="med">Med</option><option value="high">High</option></select></div><div class="prow"></div><div class="prow"><span>Blood effects</span><input type="checkbox" class="goreIn"></div></div>
+   <div class="ptab hide" id="tAud"><div class="prow"><span>Master volume</span><input id="volIn2" type="range" min="0" max="1" step="0.05"><b id="volV2"></b></div><div class="prow"><span>Music volume</span><input class="musVol" type="range" min="0" max="1" step="0.05"><b class="musV"></b><label><input type="checkbox" class="musMute"> Mute music</label></div></div>
+   <div class="ptab hide" id="tXh"><div class="prow"><span>Crosshair style, color and size</span><button class="sm" id="bXh2">Open crosshair editor</button></div></div>
+   <div class="ptab hide" id="tKb"><div class="prow"><span>Rebind every action (incl. scroll wheel)</span><button class="sm" id="bKeys2">Open keybinds</button></div><div class="prow"><span>Invert scroll-wheel weapon switch</span><input type="checkbox" class="invScr"></div></div>
+   <div class="ptab hide" id="tVc"><div class="prow"><span>Open mic (otherwise push-to-talk)</span><input type="checkbox" class="omIn"></div><div class="prow"><span>Mic gain</span><input class="micVol" type="range" min="0" max="2" step="0.05"></div><div class="prow"><span>Voice volume</span><input class="vcVol" type="range" min="0" max="1.5" step="0.05"></div><div class="prow" id="vcStat" style="color:#9ab"></div></div>
+  </div>
+  <div class="ppage hide" id="pScore"><div id="pSb"></div></div>
+ </div></div></div>
+<div id="xhMenu" class="scr dim hide">
+ <h2>CROSSHAIR</h2>
+ <div style="display:flex;gap:28px;align-items:flex-start">
+  <div>
+   <div class="row"><span>Style</span><select id="xhStyle"><option value="cross">Cross</option><option value="dot">Dot</option><option value="circle">Circle</option><option value="crossdot">Cross + dot</option></select></div>
+   <div class="row"><span>Color</span><span id="xhPresets"></span><input id="xhHex" maxlength="7" style="width:90px"></div>
+   <div class="row"><span>Size</span><input id="xhSize" type="range" min="2" max="30" step="1"><span id="xhSizeV"></span></div>
+   <div class="row"><span>Thickness</span><input id="xhThick" type="range" min="1" max="8" step="1"><span id="xhThickV"></span></div>
+   <div class="row"><span>Gap</span><input id="xhGap" type="range" min="0" max="20" step="1"><span id="xhGapV"></span></div>
+   <div class="row"><span>Opacity</span><input id="xhOp" type="range" min="0.1" max="1" step="0.05"><span id="xhOpV"></span></div>
+   <div class="row"><label><input type="checkbox" id="xhOutline"> Outline</label><label style="margin-left:14px"><input type="checkbox" id="xhDyn"> Dynamic spread</label></div>
+   <div class="row"><button class="sm" id="xhReset">Reset to default</button><button class="sm" id="xhBack">Back</button></div>
+  </div>
+  <div><div style="color:#9ab;font-size:13px;margin-bottom:4px">Live preview</div><canvas id="xhPrev" width="200" height="200" style="background:linear-gradient(135deg,#55595f,#8a948a 50%,#b8935c);border-radius:8px"></canvas><div style="color:#9ab;font-size:12px">With dynamic spread on, the preview pulses like firing</div></div>
+ </div>
+</div>
+<div id="kbMenu" class="scr dim hide">
+ <h2>KEYBINDS</h2><div style="color:#9ab;font-size:13px;margin-bottom:6px">Click an action, then press a key or mouse button. Esc cancels, Backspace unbinds. Conflicts are shown in red.</div>
+ <div style="max-height:62vh;overflow-y:auto"><table class="kbt" id="kbTable"></table></div>
+ <div class="msg" id="kbMsg"></div><div class="row" style="font-size:14px"><label><input type="checkbox" class="invScr"> Invert scroll wheel</label></div>
+ <div class="row"><button class="sm" id="kbReset">Reset to default</button><button class="sm" id="kbBack">Back</button></div>
+</div>
+<div id="hud" class="hide">
+ <div id="vign"></div><div id="emp"></div><div id="flash"></div><div id="scope" class="hide"><div class="ring"></div><div class="mil"></div><div id="breath"></div></div><div id="ret"></div><div id="floats"></div>
+ <canvas id="xh" width="200" height="200"></canvas><div id="hm"></div><div id="dmgind"></div>
+ <div id="score"><span class="b" id="sB">0</span><span class="tm" id="sT">0:60</span><span class="o" id="sO">0</span></div>
+ <div id="alive"></div><div id="flagbar" class="hide"></div>
+ <div id="kf"></div><div id="banner"></div><div id="loadout" class="hide"></div><div id="cook"></div><div id="pickMsg"></div>
+ 
+ <div id="util"></div><div id="ammo" class="glass"><div id="wslots"></div><div id="wName"></div><div class="big" id="ammoTxt">30 / 90</div></div>
+ <canvas id="minimap" width="176" height="176"></canvas><div id="hint"></div><div id="talk" class="hide">&#127908; TALKING</div><div id="mvote" class="hide"></div><div id="chat"></div><div id="chatBox" class="hide"><div id="chatMode"></div><input id="chatIn" maxlength="120"></div>
+ <div id="sb" class="hide"></div><div id="spec" class="hide"></div><div id="recap" class="hide"></div><div id="vote" class="hide"></div>
+</div>
+<script>
+'use strict';
+const $=s=>document.querySelector(s);
+const Q=new URLSearchParams(location.search);
+const SPEED=+Q.get('speed')||1, FAKENET=Q.has('fakenet'), AUTOPLAY=Q.has('autoplay'), OVERVIEW=Q.has('overview');
+const PFX='twofold-fps-v1-';
+const ICE={iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},{urls:'stun:stun.cloudflare.com:3478'},{urls:'stun:global.stun.twilio.com:3478'}]};
+const ROUNDS_TO_WIN=6, ROUND_TIME=60, FLAG_AT=40, FLAG_HOLD=3, PRE_TIME=3, VOTE_TIME=10, END_TIME=4;
+const DEG=Math.PI/180;
+const settings=Object.assign({sens:1,name:'Player'+Math.floor(Math.random()*900+100)},JSON.parse(localStorage.getItem('twofold')||'{}'));
+if(settings.gore===undefined)settings.gore=true;if(!settings.quality)settings.quality=Q.get('q')||'medium';if(Q.get('q'))settings.quality=Q.get('q');
+if(settings.micVol===undefined)settings.micVol=1;if(settings.vcVol===undefined)settings.vcVol=1;
+// ---- rebindable controls (codes are KeyboardEvent.code, or Mouse0/Mouse1/Mouse2 for mouse buttons)
+const KB_ACTIONS=[['forward','Move forward','KeyW'],['back','Move back','KeyS'],['left','Strafe left','KeyA'],['right','Strafe right','KeyD'],['jump','Jump / next spectate','Space'],['sprint','Sprint','ShiftLeft'],['steady','Hold breath (scoped)','ShiftLeft'],['crouch','Crouch','KeyC'],
+ ['fire','Fire','Mouse0'],['ads','Aim down sights','Mouse2'],['reload','Reload','KeyR'],['prim','Primary weapon','Digit1'],['sec','Secondary weapon','Digit2'],['util','Lethal (hold to cook)','KeyG'],['tactical','Tactical (hold to cook)','KeyQ'],['ping','Ping (team) - also middle mouse','KeyZ'],['melee','Melee','KeyF'],
+ ['vote1','Vote option 1','Digit1'],['vote2','Vote option 2','Digit2'],['vote3','Vote option 3','Digit3'],['backlobby','Back to lobby / menu (match end)','Digit4'],['requeue','Matchmake again (Quick Play end)','Digit1'],['score','Scoreboard','Tab'],['chat','Chat (all)','Enter'],['teamchat','Chat (team)','KeyY'],['ptt','Push-to-talk','KeyV'],['openmic','Toggle open mic',''],['freecam','Spectate: free camera','KeyX'],['nextw','Next weapon (wheel)','WheelDown'],['prevw','Previous weapon (wheel)','WheelUp'],['inspect','Inspect weapon','KeyI'],['takeover','Take over teammate bot (when dead)','KeyE'],['tacsprint','Tactical sprint (or double-tap Sprint)','']];
+// pairs that may share a key because they never apply at the same time
+const KB_SHARE=[['sprint','steady'],['prim','vote1'],['sec','vote2'],['requeue','prim'],['requeue','vote1']];
+function kbMap(){const m={};for(const [a,,d] of KB_ACTIONS)m[a]=d;return Object.assign(m,settings.keys||{})}
+let KBM=kbMap();
+function kc(a){return KBM[a]||''}
+function kbConflicts(){const by={},out={};for(const [a] of KB_ACTIONS){const c=KBM[a];if(!c)continue;(by[c]=by[c]||[]).push(a)}
+ for(const c in by){const l=by[c];if(l.length<2)continue;for(const x of l)for(const y of l){if(x===y)continue;if(!KB_SHARE.some(([p,q])=>(p===x&&q===y)||(p===y&&q===x)))out[x]=out[y]=1}}return out}
+function keyName(c){if(!c)return '(unbound)';if(c==='WheelUp')return 'Wheel up';if(c==='WheelDown')return 'Wheel down';if(c.startsWith('Mouse'))return ['Left mouse','Middle mouse','Right mouse','Mouse 4','Mouse 5'][+c.slice(5)]||c;return c.replace(/^Key/,'').replace(/^Digit/,'').replace('Left',' (L)').replace('Right',' (R)')}
+let relayCache=null;
+async function getIce(){const r=settings.relay||{};const ice={iceServers:ICE.iceServers.slice()};
+ if(r.mode==='metered'&&r.app&&r.key){if(!relayCache||Date.now()-relayCache.t>3e5){const app=String(r.app).trim().replace(/^https?:\/\//,'').replace(/\.metered\.live.*$/,'');
+   const res=await fetch('https://'+encodeURIComponent(app)+'.metered.live/api/v1/turn/credentials?apiKey='+encodeURIComponent(r.key.trim()));if(!res.ok)throw new Error('Metered returned HTTP '+res.status+' (check app name / API key)');
+   const arr=await res.json();if(!Array.isArray(arr))throw new Error('Unexpected reply from Metered');relayCache={t:Date.now(),s:arr}}
+  ice.iceServers.push(...relayCache.s.filter(x=>String(x.urls).indexOf('turn')>=0))}
+ else if(r.mode==='manual'&&r.url){const urls=String(r.url).split(/[\s,]+/).filter(Boolean);ice.iceServers.push({urls,username:r.user||'',credential:r.cred||''})}
+ return ice}
+function relayOn(){const r=settings.relay||{};return !!((r.mode==='metered'&&r.app&&r.key)||(r.mode==='manual'&&r.url))}
+async function linkType(pc){try{if(!pc)return '?';const st=await pc.getStats();let pair=null;const m={};st.forEach(x=>{m[x.id]=x;if(x.type==='transport'&&x.selectedCandidatePairId)pair=x.selectedCandidatePairId});
+ if(pair)pair=m[pair];if(!pair)st.forEach(x=>{if(x.type==='candidate-pair'&&x.state==='succeeded'&&(x.nominated||x.selected)&&!pair)pair=x});
+ if(!pair)return '?';const l=m[pair.localCandidateId],rm=m[pair.remoteCandidateId];return (l&&l.candidateType==='relay')||(rm&&rm.candidateType==='relay')?'Relay':'Direct'}catch(e){return '?'}}
+function saveSettings(){localStorage.setItem('twofold',JSON.stringify(settings))}

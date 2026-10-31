@@ -1,0 +1,5 @@
+require('./testguard');const {launch,open,sleep}=require('./b3lib');
+(async()=>{const br=await launch();const errs=[];const h=await open(br,errs,'?fakenet&gfx='+(process.env.T||'med'));await sleep(1500);
+await h.evaluate(()=>{botThink=function(){return {f:0,r:0,yaw:0,pitch:0}};practice(0)});await sleep(6000);
+console.log(JSON.stringify(await h.evaluate(async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));const me=G.P[ME];const id=Object.keys(EMOTE).find(k=>EMOTE[k].free);let _e=null;window.__st=[];Object.defineProperty(me,'emo',{configurable:true,get:()=>_e,set:v=>{if(!v&&_e)__st.push(Math.round(performance.now()-_e.t0)+' '+new Error().stack.split('\n').slice(1,6).join(' | '));_e=v}});const ok=emoPlay(id);const dur=EMOTE[id].dur;const s=[];
+ for(let i=0;i<10;i++){await W(dur*100);s.push(me.emo?1:0)}return {id,ok,dur,s,why:window.__emoCancel,st:{cook:me.cook,swapT:me.swapT,melee:me.meleeT,rel:me.reloadT,cr:me.crouch,whl:WHL,rs:G.rs},stk:__st,downs:EMO_CANCEL.filter(k=>down(k))}})));await br.close()})();

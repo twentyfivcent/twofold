@@ -1,0 +1,63 @@
+// ===================== v6 ACCOUNTS (Supabase) + MATCH STATS =====================
+const SB_URL='https://uvhnotllzflrrajlrqtd.supabase.co',SB_KEY='sb_publishable_zcBZ8iz5yE5g_k3Zut78gg_g5yy_lPY';// publishable key: public by design
+let MSTAT={g:{},dmg:0};
+function MSTAT_reset(){MSTAT={g:{},dmg:0,t0:Date.now()}}
+function msG(id){return MSTAT.g[id]||(MSTAT.g[id]={gun:id,kills:0,headshots:0,shots:0,hits:0,damage:0})}
+function MSTAT_shot(id){if(W[id])msG(id).shots++}
+function MSTAT_ev(e){if(!G)return;if(e.t==='dmg'&&e.a===ME&&e.v!==ME&&W[e.w]){const v=G.P[e.v],a=G.P[ME];if(v&&a&&v.team!==a.team){const s=msG(e.w);s.hits++;s.damage+=e.amt|0;MSTAT.dmg+=e.amt|0}}
+ if(e.t==='kf'&&e.k===ME&&e.v!==ME&&!e.tk&&W[e.w]){const s=msG(e.w);s.kills++;if(e.hs)s.headshots++}}
+// v7 DEV tag: admin-only profiles.dev (set in Supabase, players can't change it). Names below are the built-in DEV accounts;
+// the live list is refreshed from the dev_usernames() RPC. Guests can't play under a DEV name (see myName).
+const DEVS=new Set(['twentyfivcent','weebier']);
+function isDev(n){n=String(n||'').replace(/ \(bot\)$/,'').toLowerCase();return DEVS.has(n)}
+function devB(n){return isDev(n)?'<span class="devtag">&quot;DEV&quot;</span>':''}
+const ACC={sb:null,status:'init',user:null,profile:null,guest:true,keys:{},owned:{},equipped:{},history:[],guns:[],lb:[],msg:'',busy:false,listeners:[],
+ acctName(){return ACC.user&&!ACC.guest&&ACC.profile&&ACC.profile.username?String(ACC.profile.username):null},
+ emit(){try{syncNameField()}catch(e){}for(const f of ACC.listeners)try{f()}catch(e){console.warn(e)}},
+ missing(err){const c=err&&(err.code||'');const m=(err&&err.message||'')+'';return c==='42P01'||c==='PGRST205'||c==='PGRST202'||c==='42883'||/does not exist|schema cache|Could not find/i.test(m)},
+ async init(){try{
+  if(!window.supabase||!window.supabase.createClient){ACC.status='offline';ACC.msg='Account server unreachable - playing as guest.';ACC.emit();return}
+  ACC.sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
+  const chk=await ACC.sb.from('crates').select('id').limit(1);if(chk.error&&ACC.missing(chk.error)){ACC.status='nosetup';ACC.msg='Account server not set up yet - playing as guest.';ACC.emit();return}
+  ACC.status='ready';ACC.sb.rpc('dev_usernames').then(r=>{if(r&&!r.error&&Array.isArray(r.data)){for(const x of r.data)DEVS.add(String(x&&x.dev_usernames||x).toLowerCase());ACC.emit()}}).catch(()=>{});const {data}=await ACC.sb.auth.getSession();if(data&&data.session){ACC.user=data.session.user;ACC.guest=false;await ACC.load()}
+  ACC.sb.auth.onAuthStateChange((ev,ses)=>{if(ev==='SIGNED_OUT'){ACC.user=null;ACC.guest=true;ACC.profile=null;ACC.equipped={};ACC.owned={};ACC.keys={};ACC.emit()}});
+  ACC.emit()}catch(e){ACC.status='offline';ACC.msg='Account server unreachable - playing as guest.';console.warn('acc',e);ACC.emit()}},
+ ok(){return ACC.status==='ready'&&ACC.user&&!ACC.guest},
+ err(e){const m=(e&&e.message)||String(e);ACC.msg=ACC.missing(e)?'Account server not set up yet.':m.replace(/^.*?:\s*(?=[a-z])/,'');ACC.emit();return {error:ACC.msg}},
+ // v6 username-only accounts: the username maps to a hidden synthetic email for Supabase auth. It is never shown in the UI.
+ synth(u){return String(u).toLowerCase()+'@players.twofold.invalid'},
+ validU(u){return /^[a-z0-9_]{3,16}$/.test(String(u).toLowerCase())},
+ async signUp(user,pw){if(ACC.status!=='ready')return {error:ACC.msg||'Account server not set up yet.'};if(!ACC.validU(user))return {error:'Username: 3-16 letters, numbers or _'};if(!pw||pw.length<6)return {error:'Password must be 6+ characters.'};
+  const av=await ACC.sb.rpc('username_available',{p_username:user});if(!av.error&&av.data===false){ACC.msg='That name is taken - try another.';ACC.emit();return {error:ACC.msg}}
+  const r=await ACC.sb.auth.signUp({email:ACC.synth(user),password:pw,options:{data:{username:user}}});
+  if(r.error){if(/already|registered|exists|duplicate|taken/i.test(r.error.message||'')){ACC.msg='That name is taken - try another.';ACC.emit();return {error:ACC.msg}}return ACC.err(r.error)}
+  if(!r.data.session){const s2=await ACC.sb.auth.signInWithPassword({email:ACC.synth(user),password:pw});if(s2.error){ACC.msg='Account created - sign in to continue.';ACC.emit();return {pending:true}}r.data.session=s2.data.session}
+  ACC.user=r.data.session.user;ACC.guest=false;await ACC.load();if(ACC.profile&&!ACC.profile.username){const u=await ACC.sb.rpc('set_username',{p_username:user});if(u.error)ACC.err(u.error);else ACC.profile=u.data}ACC.msg='Account created.';ACC.emit();return {ok:true}},
+ async signIn(user,pw){if(ACC.status!=='ready')return {error:ACC.msg||'Account server not set up yet.'};if(!ACC.validU(user))return {error:'Enter your username (3-16 letters, numbers or _).'};const r=await ACC.sb.auth.signInWithPassword({email:ACC.synth(user),password:pw});if(r.error){ACC.msg=/invalid/i.test(r.error.message||'')?'Wrong username or password.':ACC.err(r.error).error;ACC.emit();return {error:ACC.msg}}ACC.user=r.data.user||r.data.session.user;ACC.guest=false;await ACC.load();ACC.msg='Signed in.';ACC.emit();return {ok:true}},
+ async addRecovery(email){if(!ACC.ok())return {error:'Sign in first.'};if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email||''))return {error:'Enter a valid email.'};const r=await ACC.sb.auth.updateUser({email});if(r.error)return ACC.err(r.error);ACC.msg='Check that inbox and click the confirmation link to finish adding your recovery email.';ACC.emit();return {ok:true}},
+ async forgot(user,email){if(ACC.status!=='ready')return {error:'Account server not set up yet.'};if(!ACC.validU(user)||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email||''))return {error:'Enter your username and the recovery email you added.'};const r=await ACC.sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});if(r.error)return ACC.err(r.error);ACC.msg='If that recovery email is on an account, a reset link is on its way. This only works if you added a recovery email in Account settings.';ACC.emit();return {ok:true}},
+ async signOut(){if(ACC.sb)await ACC.sb.auth.signOut();ACC.user=null;ACC.guest=true;ACC.profile=null;ACC.equipped={};ACC.owned={};ACC.keys={};ACC.history=[];ACC.guns=[];ACC.msg='Signed out - playing as guest.';ACC.emit()},
+ playGuest(){ACC.guest=true;ACC.msg='Playing as guest - progress is not saved.';ACC.emit()},
+ async setUsername(u){const r=await ACC.sb.rpc('set_username',{p_username:u});if(r.error)return ACC.err(r.error);ACC.profile=r.data;ACC.emit();return {ok:true}},
+ async load(){if(!ACC.user)return;const sb=ACC.sb,uid=ACC.user.id;
+  const [p,inv,eq]=await Promise.all([sb.from('profiles').select('*').eq('id',uid).maybeSingle(),sb.from('inventory').select('item_type,item_id,qty'),sb.from('equipped').select('gun,skin_id')]);
+  if(p.error){ACC.err(p.error);return}ACC.profile=p.data;ACC.keys={};ACC.owned={};for(const r of inv.data||[]){if(r.item_type==='key')ACC.keys[r.item_id]=r.qty;else if(r.qty>0)ACC.owned[r.item_id]=r.qty}
+  ACC.equipped={};for(const r of eq.data||[])ACC.equipped[r.gun]=r.skin_id;
+  if(ACC.profile&&ACC.profile.settings&&Object.keys(ACC.profile.settings).length){const s=ACC.profile.settings;for(const k of SYNC_KEYS)if(s[k]!==undefined)settings[k]=s[k];localStorage.setItem('twofold',JSON.stringify(settings));if(typeof syncAllSettings==='function')syncAllSettings()}
+  await ACC.loadStats();ACC.emit()},
+ async loadStats(){if(!ACC.ok())return;const sb=ACC.sb;const [h,g]=await Promise.all([sb.from('match_history').select('*').order('played_at',{ascending:false}).limit(20),sb.from('gun_stats').select('*')]);
+  ACC.history=h.data||[];ACC.guns=(g.data||[]).map(r=>Object.assign({},r,{accuracy:r.shots_fired>0?100*r.shots_hit/r.shots_fired:0,hs_pct:r.kills>0?100*r.headshots/r.kills:0}))},
+ async loadLB(){if(!ACC.sb||ACC.status!=='ready')return;let r=await ACC.sb.from('leaderboard_v8').select('*').limit(50);if(r.error)r=await ACC.sb.from('leaderboard').select('*').limit(50);/*v8: leaderboard_v8 adds crates + hover stats; old view as fallback*/ACC.lb=r.data||[];ACC.emit()},
+ async buyKey(cid){if(!ACC.ok())return {error:'Sign in to buy keys.'};const r=await ACC.sb.rpc('buy_key',{p_crate_id:cid});if(r.error)return ACC.err(r.error);ACC.profile=r.data;ACC.keys[cid]=(ACC.keys[cid]||0)+1;ACC.emit();return {ok:true}},
+ async openCrate(cid){if(!ACC.ok())return {error:'Sign in to open crates.'};if(!(ACC.keys[cid]>0))return {error:'You need a key for this crate.'};const r=await ACC.sb.rpc('open_crate',{p_crate_id:cid});if(r.error)return ACC.err(r.error);
+  const s=Array.isArray(r.data)?r.data[0]:r.data;ACC.keys[cid]--;ACC.owned[s.id]=(ACC.owned[s.id]||0)+1;return {skin:s.id}},
+ async equip(gun,skin){if(!ACC.ok())return {error:'Sign in to equip skins.'};const r=await ACC.sb.rpc('equip_skin',{p_gun:gun,p_skin_id:skin||''});if(r.error)return ACC.err(r.error);if(skin)ACC.equipped[gun]=skin;else delete ACC.equipped[gun];ACC.emit();return {ok:true}},
+ _st:0,queueSettings(){if(!ACC.ok())return;clearTimeout(ACC._st);ACC._st=setTimeout(async()=>{const o={};for(const k of SYNC_KEYS)if(settings[k]!==undefined)o[k]=settings[k];const r=await ACC.sb.rpc('save_settings',{p_settings:o});if(r.error)ACC.err(r.error)},1200)},
+ lastReport:null,
+ async matchOver(won,mvp,mvInfo){ACC.lastMvp=mvInfo||null;const me=G&&G.P[ME];if(!me)return;const guns=Object.values(MSTAT.g).filter(s=>s.shots||s.kills||s.hits).slice(0,12);
+  const args={p_mvp:!!mvp,p_result:won?'win':'loss',p_kills:Math.max(0,me.k|0),p_deaths:me.d|0,p_headshots:guns.reduce((a,s)=>a+s.headshots,0),p_map:G.mapDef.n,p_mode:(G.practice||(HOST&&!hostConn&&!(typeof LOBBY!=='undefined'&&LOBBY)&&G.P.every(p=>p.bot||p.id===ME)))?'practice':'online'/*v8 d2: Practice vs Bots never counts; lobby + Quick Play (even bot-filled) do*/,p_team_score:G.sc[me.team],p_enemy_score:G.sc[1-me.team],p_damage:MSTAT.dmg|0,p_guns:guns};
+  ACC.lastReport=args;if(!ACC.ok())return;const r=await ACC.sb.rpc('report_match',args);if(r.error){ACC.err(r.error);return}const before=ACC.profile?ACC.profile.money:0;ACC.profile=r.data;ACC.lastEarn=(r.data.money-before);await ACC.loadStats();ACC.emit();
+  try{addKF(`<span style="color:#ffd76a">+$${ACC.lastEarn} earned</span>`);kfList[kfList.length-1].t=15}catch(e){}}
+};
+const SYNC_KEYS=['sens','vol','musVol','musMute','dmgNums','botDiff','xh','keys','quality','gfx','gore','invScroll','openMic','micVol','vcVol','name'];
+{const _ss=saveSettings;saveSettings=function(){_ss();try{ACC.queueSettings()}catch(e){}}}

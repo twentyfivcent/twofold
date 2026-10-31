@@ -1,0 +1,45 @@
+// ===================== TEXT CHAT + VOICE CHAT =====================
+let CHATLOG=[];
+function esc(t){return String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function openChat(team){if(!G)return;CHAT.open=true;CHAT.team=!!team;for(const k in K)K[k]=false;$('#chatBox').classList.remove('hide');$('#chatMode').textContent=team?'[TEAM]':'[ALL]';$('#chatMode').style.color=team?'#7f7':'#fff';const i=$('#chatIn');i.value='';try{document.exitPointerLock()}catch(e){}setTimeout(()=>i.focus(),0)}
+function closeChat(){CHAT.open=false;$('#chatBox').classList.add('hide');$('#chatIn').blur();if(G&&!OVERVIEW&&!AUTOPLAY)lockPointer()}
+function sendChat(m,team){m=String(m||'').trim().slice(0,120);if(!m)return;if(HOST||!hostConn)hostChat(LOBBY&&!G?LOBBY.me:ME,m,team);else netSend(hostConn,{t:'chat',m,tm:team?1:0})}
+function slotTeam(i){return G?G.P[i].team:(i<2?0:1)}
+function slotName(i){if(G)return G.P[i].name;const s=LOBBY&&LOBBY.slots[i];return s&&s.name||'?'}
+// host relays: team messages only reach the sender's team
+function hostChat(pid,m,team){m=String(m||'').trim().slice(0,120);if(!m||!(pid>=0&&pid<4))return;const msg={t:'chat',s:pid,n:slotName(pid),team:slotTeam(pid),m,tm:team?1:0};
+ const tgt=[];if(G){for(const p of G.P)if(!p.bot&&p.conn)tgt.push([p.id,p.conn])}else if(LOBBY){LOBBY.slots.forEach((s,i)=>{if(s&&s.conn)tgt.push([i,s.conn])})}
+ for(const [i,c] of tgt)if(!team||slotTeam(i)===msg.team)netSend(c,msg);
+ const myIdx=G?ME:LOBBY?LOBBY.me:0;if(!team||slotTeam(myIdx)===msg.team)chatShow(msg)}
+function chatShow(d){const col=d.team?'#ff9b3d':'#5aa8ff';const h=`${d.tm?'<span style="color:#7f7">[TEAM]</span> ':''}<b style="color:${col}">${esc(d.n)}</b>${devB(d.n)}<b style="color:${col}">:</b> ${esc(d.m)}`;CHATLOG.push({h,t:10});if(CHATLOG.length>8)CHATLOG.shift();
+ const lc=$('#lchat');if(lc){lc.insertAdjacentHTML('beforeend','<div>'+h+'</div>');lc.scrollTop=1e6}SND.ui(1400);window.__chat=(window.__chat||0)+1}
+function chatHUD(dt){for(const c of CHATLOG)c.t-=dt;const el=$('#chat');el.innerHTML=CHATLOG.filter(c=>CHAT.open||c.t>0).map(c=>`<div style="opacity:${CHAT.open?1:Math.min(1,c.t/2)}">${c.h}</div>`).join('');voiceTick()}
+$('#chatIn').addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'){sendChat(e.target.value,CHAT.team);closeChat()}else if(e.key==='Escape'){closeChat()}});
+$('#lchatIn').addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'&&LOBBY){sendChat(e.target.value,false);e.target.value=''}});
+
+// ---- voice: PeerJS media-call mesh between human players; the lower peer id calls the higher.
+// Mic -> gain gate (push-to-talk or open mic) -> MediaStreamDestination, so nothing is sent while the gate is shut.
+const VOICE={st:'off',mic:null,gate:null,dest:null,calls:{},an:{},talking:{},me:false,ids:[],els:{}};
+function voiceIds(){if(!G)return [];const a=[null,null,null,null];if(HOST){if(peer)a[ME]=peer.id;for(const p of G.P)if(!p.bot&&p.conn&&p.conn.peer)a[p.id]=p.conn.peer}else a.splice(0,4,...(G.vp||a));return a}
+async function voiceInit(){if(VOICE.st!=='off'||FAKENET||!peer||typeof peer.call!=='function')return;VOICE.st='starting';const a=ac();
+ try{if(!a)throw new Error('no audio');VOICE.dest=a.createMediaStreamDestination();VOICE.gate=a.createGain();VOICE.gate.gain.value=0;VOICE.gate.connect(VOICE.dest)}catch(e){VOICE.st='broken';return}
+ try{VOICE.mic=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});const src=a.createMediaStreamSource(VOICE.mic);VOICE.micGain=a.createGain();src.connect(VOICE.micGain);VOICE.micGain.connect(VOICE.gate);VOICE.st='on'}
+ catch(e){VOICE.st='nomic';if(G)addKF('<span style="color:#fb6">Microphone unavailable - voice chat is listen-only</span>')}
+ peer.on('call',c=>{c.answer(VOICE.dest.stream);voiceWire(c)});voiceUpdate()}
+function voiceWire(c){VOICE.calls[c.peer]=c;c.on('stream',s=>{let el=VOICE.els[c.peer];if(!el){el=new Audio();el.autoplay=true;VOICE.els[c.peer]=el}el.srcObject=s;el.volume=Math.min(1,settings.vcVol);el.play().catch(()=>{});
+  try{const an=AC.createAnalyser();an.fftSize=256;AC.createMediaStreamSource(s).connect(an);VOICE.an[c.peer]=an}catch(e){}});
+ const end=()=>{delete VOICE.calls[c.peer];delete VOICE.an[c.peer];const el=VOICE.els[c.peer];if(el){el.srcObject=null;delete VOICE.els[c.peer]}};c.on('close',end);c.on('error',end)}
+function voiceUpdate(){if(!G||!peer)return;if(VOICE.st==='off'){voiceInit();return}if(!VOICE.dest)return;const ids=voiceIds();VOICE.ids=ids;
+ for(const id of ids){if(!id||id===peer.id||VOICE.calls[id])continue;if(peer.id<id){try{voiceWire(peer.call(id,VOICE.dest.stream))}catch(e){}}}}
+function syncVoiceUI(){document.querySelectorAll('.omIn').forEach(e=>e.checked=!!settings.openMic);document.querySelectorAll('.micVol').forEach(e=>e.value=settings.micVol);document.querySelectorAll('.vcVol').forEach(e=>e.value=settings.vcVol)}
+let vAcc=0;
+function voiceTick(){if(!G)return;const tx=VOICE.st==='on'&&!CHAT.open&&(settings.openMic||down('ptt'));if(VOICE.gate){VOICE.gate.gain.value=tx?1:0;if(VOICE.micGain)VOICE.micGain.gain.value=+settings.micVol}
+ VOICE.me=tx;const ids=VOICE.ids;const buf=new Uint8Array(128);
+ for(let i=0;i<4;i++){const id=ids[i];const an=id&&VOICE.an[id];let on=false;if(an){an.getByteTimeDomainData(buf);let m=0;for(const v of buf)m=Math.max(m,Math.abs(v-128));on=m>6}VOICE.talking[i]=i===ME?tx:on}
+ for(const k in VOICE.els)VOICE.els[k].volume=Math.min(1,settings.vcVol);
+ vAcc++;if(vAcc%120===0)voiceUpdate()}
+function voiceStop(){for(const k in VOICE.calls)try{VOICE.calls[k].close()}catch(e){}for(const k in VOICE.els){VOICE.els[k].srcObject=null}if(VOICE.mic)VOICE.mic.getTracks().forEach(t=>t.stop());Object.assign(VOICE,{st:'off',mic:null,gate:null,dest:null,micGain:null,calls:{},an:{},talking:{},me:false,ids:[],els:{}})}
+document.querySelectorAll('.omIn').forEach(e=>e.onchange=()=>{settings.openMic=e.checked;saveSettings();syncVoiceUI()});
+document.querySelectorAll('.micVol').forEach(e=>e.oninput=()=>{settings.micVol=+e.value;saveSettings();syncVoiceUI()});
+document.querySelectorAll('.vcVol').forEach(e=>e.oninput=()=>{settings.vcVol=+e.value;saveSettings();syncVoiceUI()});
+syncVoiceUI();

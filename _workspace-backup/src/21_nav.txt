@@ -1,0 +1,49 @@
+// ===================== LAYERED NAV (v6 multi-level) =====================
+// Each 0.75m cell can hold up to NAVL standable surfaces (ground, raised decks, bridges, catwalks over a lane).
+// Node = cell*NAVL+layer. Links: walk (step <=.55m), jump/mantle up (<=1.5m), drop (<=4m). Bots + the map validator share it.
+const NAVC=.75,NAVL=4;
+function navSurfaces(boxes,x,z,rs,rb){const ov=[],sup=[0];
+ for(const b of boxes){if(b.dyn)continue;if(x+rb>b.min[0]&&x-rb<b.max[0]&&z+rb>b.min[2]&&z-rb<b.max[2]){ov.push(b);
+  if(!b.liquid&&!b.div&&!(b.wall&&!b.cover)&&!b.nowalk&&b.max[1]<=8&&x+rs>b.min[0]&&x-rs<b.max[0]&&z+rs>b.min[2]&&z-rs<b.max[2])sup.push(b.max[1])}}
+ const u=[...new Set(sup.map(v=>+v.toFixed(3)))].sort((a,b)=>b-a),out=[];
+ for(const c of u){let ok=true;for(const b of ov){if(b.liquid&&b.min[1]<=c+.05&&b.max[1]>c){ok=false;break}if(b.min[1]<c+1.75&&(b.max[1]>c+.55||b.min[1]>c+.05)){ok=false;break}}
+  if(ok&&out.some(o=>o-c<.56))ok=false;
+  if(ok){out.push(c);if(out.length>=NAVL)break}}
+ return out}
+function buildNav(boxes){const nx=Math.ceil(2*MX/NAVC),nz=Math.ceil(2*MZ/NAVC),L=NAVL,H=new Float32Array(nx*nz*L).fill(-1),blk=new Uint8Array(nx*nz),mt=null;
+ for(let i=0;i<nx;i++)for(let j=0;j<nz;j++){const x=-MX+(i+.5)*NAVC,z=-MZ+(j+.5)*NAVC;const k=i*nz+j;if(Math.abs(x)>MX-.45||Math.abs(z)>MZ-.45){blk[k]=1;continue}
+  const s=navSurfaces(boxes,x,z,.3,.42);if(!s.length){blk[k]=1;continue}s.forEach((h,l)=>H[k*L+l]=h)}
+ return {nx,nz,blk,mt,H,L}}
+function navCell(N,x,z){return [Math.max(0,Math.min(N.nx-1,Math.floor((x+MX)/NAVC))),Math.max(0,Math.min(N.nz-1,Math.floor((z+MZ)/NAVC)))]}
+function navCtr(N,i,j){return [-MX+(i+.5)*NAVC,-MZ+(j+.5)*NAVC]}
+// layer in a cell closest to height y (prefers the surface at/below y+.6)
+function navLayer(N,k,y){let best=-1,bd=1e9;for(let l=0;l<N.L;l++){const h=N.H[k*N.L+l];if(h<0)continue;const d=Math.abs(h-y)+(h>y+.6?3:0);if(d<bd){bd=d;best=l}}return best}
+function navFree(N,i,j){if(!N.blk[i*N.nz+j])return [i,j];for(let r=1;r<8;r++){let best=null,bd=1e9;for(let a=-r;a<=r;a++)for(let c=-r;c<=r;c++){if(Math.max(Math.abs(a),Math.abs(c))!==r)continue;const u=i+a,v=j+c;if(u<0||v<0||u>=N.nx||v>=N.nz||N.blk[u*N.nz+v])continue;const d=a*a+c*c;if(d<bd){bd=d;best=[u,v]}}if(best)return best}return null}
+// any node in cell with height within tol of y
+function navHas(N,k,y,tol){for(let l=0;l<N.L;l++){const h=N.H[k*N.L+l];if(h>=0&&Math.abs(h-y)<=tol)return true}return false}
+function navLine(N,p,q,y){const d=Math.hypot(q[0]-p[0],q[1]-p[1]),n=Math.max(1,Math.ceil(d/(NAVC*.35)));for(let k=0;k<=n;k++){const x=p[0]+(q[0]-p[0])*k/n,z=p[1]+(q[1]-p[1])*k/n;const c=navCell(N,x,z),kk=c[0]*N.nz+c[1];if(N.blk[kk])return false;if(y!==undefined&&!navHas(N,kk,y,.3))return false}return true}
+// link cost from node a (height ha) to b (height hb); -1 = no link
+function navLink(ha,hb){const dh=hb-ha;if(dh<=.56&&dh>=-.56)return 0;if(dh>0&&dh<=1.3)return 3;if(dh<0&&dh>=-4.2)return .6;return -1}
+function navNeighbors(N,n,f){const L=N.L,nz=N.nz,k=(n/L)|0,i=(k/nz)|0,j=k%nz,ha=N.H[n];
+ for(let a=-1;a<=1;a++)for(let c=-1;c<=1;c++){if(!a&&!c)continue;const u=i+a,v=j+c;if(u<0||v<0||u>=N.nx||v>=nz)continue;const kk=u*nz+v;if(N.blk[kk])continue;
+  for(let l=0;l<L;l++){const hb=N.H[kk*L+l];if(hb<0)continue;const e=navLink(ha,hb);if(e<0)continue;
+   if(a&&c&&(!navHas(N,i*nz+v,ha,.56)&&!navHas(N,i*nz+v,hb,.56)||!navHas(N,u*nz+j,ha,.56)&&!navHas(N,u*nz+j,hb,.56)))continue;
+   f(kk*L+l,(a&&c?1.414:1)+e)}}}
+function navNode(N,x,z,y){const c=navFree(N,...navCell(N,x,z));if(!c)return -1;const k=c[0]*N.nz+c[1];const l=navLayer(N,k,y||0);return l<0?-1:k*N.L+l}
+function navFlood(N,start,okCell){const tot=N.nx*N.nz*N.L,dist=new Float32Array(tot).fill(-1);if(start<0)return dist;const q=[start];dist[start]=0;
+ for(let qi=0;qi<q.length;qi++){const n=q[qi];navNeighbors(N,n,(m,c)=>{if(dist[m]>=0)return;const kk=(m/N.L)|0;if(okCell&&!okCell((kk/N.nz)|0,kk%N.nz))return;dist[m]=dist[n]+1;q.push(m)})}return dist}
+function navPath(N,sx,sz,gx,gz,sy,gy){const S=navNode(N,sx,sz,sy||0),GK=navNode(N,gx,gz,gy===undefined?(sy||0):gy);if(S<0||GK<0)return null;
+ const L=N.L,nz=N.nz,tot=N.nx*nz*L;const gs=new Float32Array(tot).fill(1e9),from=new Int32Array(tot).fill(-1),closed=new Uint8Array(tot);const heap=[];
+ const push=(k,f)=>{heap.push([f,k]);let i=heap.length-1;while(i>0){const p=(i-1)>>1;if(heap[p][0]<=heap[i][0])break;const t=heap[p];heap[p]=heap[i];heap[i]=t;i=p}};
+ const pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let i=0;for(;;){const l=2*i+1,r=l+1;let m=i;if(l<heap.length&&heap[l][0]<heap[m][0])m=l;if(r<heap.length&&heap[r][0]<heap[m][0])m=r;if(m===i)break;const t=heap[m];heap[m]=heap[i];heap[i]=t;i=m}}return top};
+ const gk=(GK/L)|0,gi=(gk/nz)|0,gj=gk%nz;const h=n=>{const k=(n/L)|0;const dx=Math.abs(((k/nz)|0)-gi),dz=Math.abs(k%nz-gj);return Math.max(dx,dz)+.414*Math.min(dx,dz)};
+ gs[S]=0;push(S,h(S));let it=0;
+ while(heap.length&&it++<80000){const n=pop()[1];if(closed[n])continue;closed[n]=1;if(n===GK)break;
+  navNeighbors(N,n,(m,c)=>{if(closed[m])return;const ng=gs[n]+c;if(ng<gs[m]){gs[m]=ng;from[m]=n;push(m,ng+h(m))}})}
+ if(GK!==S&&from[GK]<0)return null;const nodes=[];for(let n=GK;n!==-1;n=from[n]){nodes.push(n);if(n===S)break}nodes.reverse();
+ const pts=nodes.map(n=>{const k=(n/L)|0;const c=navCtr(N,(k/nz)|0,k%nz);return [c[0],c[1],N.H[n]]});const out=[pts[0]];let a=0;
+ // string-pull only across runs on the same level so height changes keep their exact step/jump waypoint
+ while(a<pts.length-1){let b=Math.min(pts.length-1,a+40);
+  while(b>a+1){let same=true;for(let t=a+1;t<=b;t++)if(Math.abs(pts[t][2]-pts[a][2])>.3){same=false;break}if(same&&navLine(N,pts[a],pts[b],pts[a][2]))break;b--}
+  out.push(pts[b]);a=b}
+ return out}

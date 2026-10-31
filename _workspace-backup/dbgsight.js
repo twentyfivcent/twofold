@@ -1,0 +1,5 @@
+require('./testguard');const puppeteer=require('puppeteer-core');const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+(async()=>{const br=await puppeteer.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});const p=await br.newPage();await p.goto('http://localhost:8765/index.html?q=low');await sleep(3000);
+console.log(JSON.stringify(await p.evaluate((ids)=>{const o={};for(const k of ids){const g=buildGun(k,1);const gg=g.userData.dual?g.userData.dual[0]:g;gg.updateMatrixWorld(true);const ms=gg.children.filter(c=>c.isMesh);const bs=ms.map(c=>new THREE.Box3().setFromObject(c));
+const n=bs.length,seen=new Array(n).fill(0);seen[0]=1;const st=[0];while(st.length){const i=st.pop();for(let j=0;j<n;j++)if(!seen[j]&&bs[i].clone().expandByScalar(.002).intersectsBox(bs[j])){seen[j]=1;st.push(j)}}
+o[k]={sy:gg.userData.sightY,fl:seen.map((s,i)=>s?null:i).filter(x=>x!==null).map(i=>[ms[i].geometry.type.slice(0,4),...bs[i].min.toArray().map(v=>+v.toFixed(3)),...bs[i].max.toArray().map(v=>+v.toFixed(3))])}}return o},process.argv.slice(2))));await br.close()})();

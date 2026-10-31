@@ -1,0 +1,33 @@
+// ===================== V8 DROP 2: crates (refund, rarity cues, auto-roll) + leaderboard hover card =====================
+// open_crate2 (server) pays the 10% duplicate refund and counts crates_opened; the client only displays what the server returned.
+{const _oc=ACC.openCrate;ACC.openCrate=async function(cid){if(!ACC.ok())return _oc.call(ACC,cid);if(!(ACC.keys[cid]>0))return {error:'You need a key for this crate.'};
+ let r=await ACC.sb.rpc('open_crate2',{p_crate_id:cid});if(r.error&&/Could not find|PGRST202|does not exist/i.test(r.error.message+(r.error.code||''))){ACC.lastOpen=null;return _oc.call(ACC,cid)}
+ if(r.error)return ACC.err(r.error);const s=Array.isArray(r.data)?r.data[0]:r.data;ACC.keys[cid]--;ACC.owned[s.id]=(ACC.owned[s.id]||0)+1;
+ const refund=s.refund|0;if(ACC.profile){ACC.profile.money+=refund;ACC.profile.crates_opened=(ACC.profile.crates_opened|0)+1}ACC.lastOpen={id:s.id,dup:!!s.dup,refund,rar:s.rarity,cid};return {skin:s.id}}}
+// rarity audio: escalating synth cue, common = one blip ... legendary = fanfare chord + sparkle
+function rarityCue(rar){const i=Math.max(0,RAR_ORDER.indexOf(rar));window.__rarCue=(window.__rarCue||[]).concat(rar);try{const g=SND.out(null,.5+i*.08);if(!g)return;const t=AC.currentTime;
+ const tone=(f,t0,d,type,v)=>{const o=AC.createOscillator(),e=AC.createGain();o.type=type||'triangle';o.frequency.value=f;e.gain.setValueAtTime(0,t0);e.gain.linearRampToValueAtTime(v||.35,t0+.015);e.gain.exponentialRampToValueAtTime(.001,t0+d);o.connect(e);e.connect(g);o.start(t0);o.stop(t0+d+.05)};
+ const base=[392,440,523.25,587.33,659.25][i];const steps=[[0],[0,4],[0,4,7],[0,4,7,12],[0,4,7,12,16]][i];const st=f=>base*Math.pow(2,f/12);
+ steps.forEach((s,k)=>tone(st(s),t+k*.09,.25+i*.05,i>=3?'sawtooth':'triangle',.22));
+ if(i>=2)tone(st(steps[steps.length-1]+12),t+steps.length*.09,.6+i*.2,'sine',.25);
+ if(i>=3)[0,4,7].forEach(s=>tone(st(s+12),t+steps.length*.09+.05,1.1+i*.2,'square',.07));
+ if(i>=4)for(let k=0;k<10;k++)tone(2000+Math.random()*2500,t+.55+k*.07,.18,'sine',.09)}catch(e){}}
+// auto-roll: keeps opening while you have keys for that crate; optional stop on Epic or better
+const AUTO={on:false,stopEpic:true,cid:null,timer:0,count:0};
+(function(){const res=$('#reelRes');if(!res||$('#autoRow'))return;const d=document.createElement('div');d.id='autoRow';d.style.cssText='margin:8px 0;font:13px system-ui;color:#cde;display:flex;gap:14px;justify-content:center;align-items:center';
+ d.innerHTML=`<label><input type="checkbox" id="autoRoll"> Auto-roll while I have keys</label><label><input type="checkbox" id="autoStop" checked> Stop on Epic+</label><span id="autoInfo" style="color:#9ab"></span>`;res.parentNode.insertBefore(d,$('#reelSkip'));
+ $('#autoRoll').onchange=e=>{AUTO.on=e.target.checked;if(!AUTO.on)clearTimeout(AUTO.timer);else if(AUTO.cid&&!REEL&&$('#reelClose').style.visibility==='visible')autoNext()};$('#autoStop').onchange=e=>AUTO.stopEpic=e.target.checked})();
+function autoNext(){clearTimeout(AUTO.timer);if(!AUTO.on||!AUTO.cid||$('#reel').classList.contains('hide'))return;if(!(ACC.keys[AUTO.cid]>0)){$('#autoInfo').textContent='Out of keys - auto-roll stopped.';return}
+ AUTO.timer=setTimeout(()=>{if(AUTO.on&&!$('#reel').classList.contains('hide')&&ACC.keys[AUTO.cid]>0){AUTO.count++;openReel(AUTO.cid)}},window.__fastReel?60:1400)}
+{const _or=openReel;openReel=async function(cid){AUTO.cid=cid;clearTimeout(AUTO.timer);const i=$('#autoInfo');if(i)i.textContent=AUTO.on?`Auto-roll #${AUTO.count+1} · ${Math.max(0,(ACC.keys[cid]|0)-1)} keys left after this`:'';return _or(cid)}}
+{const _ra=reelArm;reelArm=function(fn,ms){return _ra(function(){fn();const o=ACC.lastOpen;const it=o&&(SKIN[o.id]||(typeof CHAR!=='undefined'&&CHAR[o.id])||(typeof EMOTE!=='undefined'&&EMOTE[o.id]));const rar=it?it.rar:(o&&o.rar)||'common';rarityCue(rar);
+  if(o&&o.dup&&o.refund)$('#reelRes').insertAdjacentHTML('beforeend',`<div class="sub" id="dupNote" style="color:#ffd76a">Duplicate - refunded +$${o.refund} (10% of key)</div>`);
+  const epic=RAR_ORDER.indexOf(rar)>=3;if(AUTO.on){if(epic&&AUTO.stopEpic){$('#autoInfo').textContent=`Stopped: ${RAR[rar].n} drop!`;AUTO.on=false;$('#autoRoll').checked=false}else autoNext()}},ms)}}
+$('#reelClose').addEventListener('click',()=>{clearTimeout(AUTO.timer);AUTO.count=0});
+// leaderboard hover: operator portrait + stats from leaderboard_v8 (public columns only)
+(function(){const card=document.createElement('div');card.id='lbCard';card.style.cssText='position:fixed;z-index:60;display:none;pointer-events:none;background:#0e141dee;border:1px solid #3a4a60;border-radius:10px;padding:10px;color:#dfe8f5;font:13px system-ui;width:220px;box-shadow:0 8px 24px #000a';document.body.appendChild(card);
+ document.addEventListener('mouseover',e=>{const td=e.target.closest&&e.target.closest('#lbTbl .lbn');if(!td){if(!e.target.closest||!e.target.closest('#lbCard'))card.style.display='none';return}const r=(ACC.lb||[])[+td.dataset.i];if(!r)return;
+  const ch=r.char_id&&typeof CHAR!=='undefined'&&CHAR[r.char_id]?r.char_id:'op';const kd=r.deaths?(r.kills/r.deaths).toFixed(2):(r.kills||0);let img='';try{img=portrait(ch,null,120,150)}catch(_){}
+  card.innerHTML=`<div style="display:flex;gap:10px"><img src="${img}" style="width:84px;height:105px;background:#18212e;border-radius:6px"><div><b style="font-size:15px">${esc6(r.username)}</b>${r.dev||isDev(r.username)?' <span class="devtag">&quot;DEV&quot;</span>':''}<div class="sub">${esc6(ch==='op'?'Operator':CHAR[ch].n)}</div>
+  <div>Level <b>${r.level}</b></div><div>W-L <b>${r.wins}-${r.losses??'?'}</b></div><div>K/D <b>${kd}</b></div><div>HS kills <b>${r.headshots??'?'}</b></div><div>Matches <b>${r.matches??'?'}</b></div><div>Crates <b>${r.crates_opened|0}</b></div></div></div>`;
+  const b=td.getBoundingClientRect();card.style.left=Math.min(innerWidth-230,b.right+8)+'px';card.style.top=Math.max(4,Math.min(innerHeight-150,b.top-40))+'px';card.style.display='block'})})();

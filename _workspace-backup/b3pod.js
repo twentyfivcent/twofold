@@ -1,0 +1,12 @@
+require('./testguard');const {launch,open,sleep}=require('./b3lib');(async()=>{const br=await launch();const errs=[],R={};const h=await open(br,errs);
+await h.evaluate(async()=>{await ACC.signUp('weebier','secret123')});
+await h.evaluate(()=>__api.hostOnline());await sleep(800);const code=await h.evaluate(()=>__api.LOBBY.code);const c=await open(br,errs);await c.evaluate(cd=>__api.joinOnline(cd),code);await sleep(2500);
+await h.evaluate(()=>__api.hostStartMatch());await sleep(4000);await h.bringToFront();
+await h.evaluate(()=>{window.__forceMap=1;G.rs='live';G.P.forEach((p,i)=>{p.k=3+i*2;p.d=4-i;p.dmg=300+i*150});G.sc=[5,2];endRound(G.P[ME].team,'test')});
+await sleep(500);R.rs=await h.evaluate(()=>[G.rs,G.rt]);R.pod=await h.evaluate(()=>window.__podium);
+await sleep(2500);await h.screenshot({path:'progress/v7-podium-early.png'});
+await h.evaluate(()=>castMapVote(1));await sleep(3500);await h.screenshot({path:'progress/v7-podium.png'});
+R.plates=await h.evaluate(()=>[...document.querySelectorAll('#podPlates .pplate')].map(e=>e.textContent));
+await c.bringToFront();await sleep(800);R.podC=await c.evaluate(()=>window.__podium);await c.screenshot({path:'progress/v7-podium-client.png'});
+await h.bringToFront();await c.evaluate(()=>castMapVote(1));await sleep(300);R.early=await h.evaluate(()=>[G.rs,G.rt.toFixed(1)]);await sleep(5000);R.after=await h.evaluate(()=>[G.rs,!!window.__podium]);
+console.log(JSON.stringify(R));console.log('ERRS',JSON.stringify(errs));await br.close()})();

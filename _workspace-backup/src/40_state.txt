@@ -1,0 +1,5 @@
+// ===================== STATE =====================
+let G=null, HOST=false, ME=0, peer=null, hostConn=null, LOBBY=null, started=false;
+function mkPlayer(i){return {id:i,team:i<2?0:1,name:'Bot',bot:true,off:false,conn:null,pos:[0,0,0],vel:[0,0,0],yaw:0,pitch:0,hp:100,alive:true,crouch:false,ground:false,inv:[{w:'kestrel',mag:30,res:90},{w:'sparrow',mag:12,res:36}],cur:0,util:'frag',utilN:1,k:0,d:0,dmg:0,rpos:[0,0,0],ryaw:0,fireCd:0,reloadT:0,burst:0,trig:false,shotIdx:0,cook:-1,blind:0,ads:false,adsAmt:0,swapT:0,bot_:null,meleeCd:0,meleeT:0,cloakT:0,empT:0,chg:0,grap:null,alt:0}}
+function curW(p){return W[p.inv[p.cur].w]}
+function activeP(){return G.P.filter(p=>!p.off)}

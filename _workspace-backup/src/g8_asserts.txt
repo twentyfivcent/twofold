@@ -1,0 +1,11 @@
+// v6 test assert: no player mesh may ever be a decoy mesh or carry decoy (holo/additive) materials
+window.__assertNoDecoyPlayers=function(){const bad=[];(pMeshes||[]).forEach((g,i)=>{if(!g)return;if(g.userData.isDecoy)bad.push(i+':isDecoy');g.traverse(o=>{const ms=Array.isArray(o.material)?o.material:[o.material];for(const mm of ms)if(mm&&mm.userData&&mm.userData.holo)bad.push(i+':holo material')})});return bad};
+
+// v8 spawn-clearance check (run for every map by the test suite, and logged on every map load): no map box (other than spawn walls/cover)
+// and no decor mesh may sit inside either spawn room (x +-10, z 18.4..24 in half-coords, 5cm..3m height).
+window.__spawnClear=function(){const out=[];if(!G||!mapGroup)return out;const X0=-10*MS,X1=10*MS,Z0=-24*MS,Z1=-18.4*MS;
+ const hit=(mn,mx)=>{for(const s of [1,-1]){const a=s>0?[Z0,Z1]:[-Z1,-Z0];if(mx.x>X0&&mn.x<X1&&mx.z>a[0]&&mn.z<a[1]&&mx.y>.05&&mn.y<3)return true}return false};
+ for(const b of G.boxes){if(b.wall||b.cover||b.dyn)continue;if(hit({x:b.min[0],y:b.min[1],z:b.min[2]},{x:b.max[0],y:b.max[1],z:b.max[2]}))out.push('box '+(b.tex||'')+' '+b.min.map(v=>v.toFixed(1)))}
+ mapGroup.updateMatrixWorld(true);const bb=new THREE.Box3(),sz=new THREE.Vector3();mapGroup.traverse(o=>{if(!o.isMesh||o.isInstancedMesh||o.userData.spawnOk)return;bb.setFromObject(o);bb.getSize(sz);if(sz.x>12||sz.z>12)return;if(hit(bb.min,bb.max))out.push('mesh '+o.geometry.type+' '+bb.min.toArray().map(v=>v.toFixed(1)))});
+ if(out.length)console.warn('[v8 spawn check] '+G.mapDef.n+': '+out.length+' object(s) inside a spawn room',out.slice(0,5));return out};
+{const _bm=buildMap;buildMap=function(){const r=_bm.apply(this,arguments);try{if(G&&G.boxes)window.__spawnLast=__spawnClear()}catch(e){}return r}}

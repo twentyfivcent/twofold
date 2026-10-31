@@ -1,0 +1,110 @@
+// ===================== v7.1: synced DEV tag colour, end-of-match keybinds, Quick Play end panel =====================
+// DEV tag colour is driven from one clock so HUD text rebuilt every frame (chat, killfeed) still cycles smoothly (2.3s loop).
+{const ST=[[0,0xff3b3b],[.16,0xff9f1a],[.33,0xffe83a],[.5,0x3bff6a],[.66,0x2ad8ff],[.83,0xb45bff],[1,0xff3b3b]];
+ const lerp=(a,b,f)=>{const r=(a>>16)+(((b>>16)-(a>>16))*f),g=((a>>8)&255)+((((b>>8)&255)-((a>>8)&255))*f),bl=(a&255)+(((b&255)-(a&255))*f);return `rgb(${r|0},${g|0},${bl|0})`};
+ const tick=()=>{const t=(performance.now()%2300)/2300;let i=0;while(i<ST.length-2&&t>ST[i+1][0])i++;const f=(t-ST[i][0])/(ST[i+1][0]-ST[i][0]);document.documentElement.style.setProperty('--dvc',lerp(ST[i][1],ST[i+1][1],Math.max(0,Math.min(1,f))))};
+ tick();setInterval(tick,40)}
+// ---- remember whether this match came from Quick Play (host and clients both have LOBBY.qp)
+{const _sg=startGame;startGame=function(cfg){const r=_sg.apply(this,arguments);try{if(G)G.qp=!!(LOBBY&&LOBBY.qp)}catch(e){}return r}}
+const QPEND={t:0,k:null};
+function qpEndLeft(){if(!QPEND.t)QPEND.t=performance.now()+MAPVOTE_TIME*1000;return Math.max(0,(QPEND.t-performance.now())/1000)}
+function qpMenu(){QPEND.t=0;try{MM.reset()}catch(e){}quitToMenu('')}
+function qpRequeue(){QPEND.t=0;try{MM.reset()}catch(e){}quitToMenu('');try{MM.start()}catch(e){}}
+// ---- end-of-match keys (work while pointer-locked / fullscreen)
+{const _pa=pressAction;pressAction=function(code,rep){
+ if(G&&!rep&&(G.rs==='mapvote'||G.rs==='nextmap')){
+  if(G.qp&&G.rs==='mapvote'){if(isKey(code,'requeue')){qpRequeue();return true}if(isKey(code,'backlobby')){qpMenu();return true}}
+  else if(isKey(code,'backlobby')){backToLobbyClick();return true}}
+ return _pa(code,rep)}}
+// ---- HUD: QP end panel instead of the map vote; key hint on the back-to-lobby button
+{const _mv=mapVoteHUD;mapVoteHUD=function(){
+ if(G&&G.qp&&G.rs==='mapvote'){const el=$('#mvote');el.classList.remove('hide');const left=qpEndLeft();
+  if(QPEND.k!=='qp'){QPEND.k='qp';MVUI.k=null;el.innerHTML=`<div class="mvh">QUICK PLAY - MATCH OVER <span id="qpT" style="color:#fb6"></span></div><div class="mvr qpend"><button class="mvc qpc" id="bQpAgain"><div class="vk">[${keyName(kc('requeue'))}]</div><b>Matchmake again</b><div style="color:#9ab;font-size:12px">New match on a random map</div></button><button class="mvc qpc" id="bQpMenu"><div class="vk">[${keyName(kc('backlobby'))}]</div><b>Back to menu</b><div style="color:#9ab;font-size:12px">Leave Quick Play</div></button></div>`;
+   $('#bQpAgain').onclick=e=>{e.stopPropagation();qpRequeue()};$('#bQpMenu').onclick=e=>{e.stopPropagation();qpMenu()}}
+  const t=$('#qpT');if(t)t.textContent=Math.ceil(left)+'s';if(left<=0)qpMenu();return}
+ if(QPEND.k==='qp'){QPEND.k=null;QPEND.t=0}
+ _mv()}}
+// back button textContent is rewritten each frame by the v7 hook; keep the hint by rewriting it as label + key span
+{const _mv2=mapVoteHUD;mapVoteHUD=function(){_mv2();const b=$('#bBackLobby');if(!b||!G||G.qp&&G.rs==='mapvote')return;const lbl=!LOBBY?'Back to Menu':HOST?'Back to Lobby (everyone)':G.backReq?'Back to Lobby - requested':'Back to Lobby (vote)';const k='['+keyName(kc('backlobby'))+']';
+ const h=`<span class="vk">${k}</span>${lbl}`;if(b.innerHTML!==h)b.innerHTML=h}}
+// ---- Quick Play client whose host leaves during the end screen: go to the menu instead of trying to reconnect
+{const _cr=clientReconnect;clientReconnect=function(w){if(G&&G.qp&&(G.rs==='mapvote'||G.rs==='over'||G.rs==='nextmap')){qpMenu();$('#menuMsg').textContent='The match is over - the host left. Press Quick Play to find a new match.';return}return _cr.apply(this,arguments)}}
+// ===================== v7.1: Loadout split into Gun Skins / Characters / Emotes, with live 3D previews =====================
+let LDT='skins';const LDV={r:null,sc:null,cam:null,m:null,key:'',sel:{chars:null,emotes:null},yaw:0,drag:null,idle:9,raf:0};
+/*v8 fix: the grid re-render (card click / account refresh) detached #ldvBox, so a NEW box+canvas was created while the WebGL renderer kept drawing into the old detached canvas -> blank preview. Keep one box for the page lifetime.*/function ldvBox(){let b=LDV.box||$('#ldvBox');if(!b){b=document.createElement('div');b.id='ldvBox';b.innerHTML='<canvas id="ldvCv" width="280" height="340"></canvas><div id="ldvInfo"></div><button id="ldvEquip" class="sm"></button>';LDV.box=b;
+ const cv=b.querySelector('canvas');cv.onpointerdown=e=>{LDV.drag=e.clientX;LDV.idle=0;try{cv.setPointerCapture(e.pointerId)}catch(_){}};cv.onpointerup=()=>LDV.drag=null;cv.onpointermove=e=>{if(LDV.drag===null)return;LDV.yaw+=(e.clientX-LDV.drag)*.012;LDV.drag=e.clientX;LDV.idle=0}}return b}
+function ldvInit(){if(LDV.r)return true;try{LDV.r=new THREE.WebGLRenderer({canvas:$('#ldvCv'),antialias:true,alpha:true,preserveDrawingBuffer:true})}catch(e){return false}LDV.r.setPixelRatio(Math.min(2,devicePixelRatio||1));if(THREE.sRGBEncoding)LDV.r.outputEncoding=THREE.sRGBEncoding;
+ LDV.sc=new THREE.Scene();LDV.sc.add(new THREE.HemisphereLight(0xdde8ff,0x302820,1.1));const d=new THREE.DirectionalLight(0xffffff,1.3);d.position.set(2,4,3);LDV.sc.add(d);const r2=new THREE.DirectionalLight(0x88aaff,.6);r2.position.set(-3,2,-2);LDV.sc.add(r2);LDV.cam=new THREE.PerspectiveCamera(30,280/340,.1,30);return true}
+function ldvSet(cid,emo){const key=cid+'|'+(emo||'');if(LDV.key===key&&LDV.m)return;LDV.key=key;if(LDV.m)LDV.sc.remove(LDV.m);const q0=settings.quality;settings.quality='medium';let m;try{m=buildCharMesh({team:0,id:-1},false,cid)}finally{settings.quality=q0}scene.remove(m);
+ for(const k of ['marker','talk','tag','ring']){const o=m[k]||m.userData[k];if(o&&o.isObject3D)o.visible=false}LDV.m=m;LDV.emo=emo||null;LDV.t0=performance.now();LDV.yaw=0;LDV.idle=9;LDV.sc.add(m)}
+function ldvLoop(){cancelAnimationFrame(LDV.raf);const f=()=>{const box=$('#ldvBox');if(!box||!box.isConnected||LDT==='skins'||$('#mLoad').classList.contains('hide')||$('#menu').classList.contains('hide'))return;
+ const m=LDV.m;if(m){LDV.idle+=1/60;if(LDV.drag===null&&LDV.idle>1.5)LDV.yaw+=.008;m.rotation.y=Math.PI+.35+LDV.yaw;const u=m.userData;
+  if(u.hipsY0===undefined)u.hipsY0=u.hips.position.y;u.hips.position.y=u.hipsY0;u.hips.rotation.y=0;u.up.rotation.z=0;u.head.rotation.z=0;for(const g of u.legs||[]){g.th.rotation.x=0;g.kn.rotation.x=0}/*v8: emote poses add to the hips each frame; reset first or the model drifts out of frame*/
+  if(LDV.emo&&EMOTE[LDV.emo]){const D=EMOTE[LDV.emo].dur,t=((performance.now()-LDV.t0)/1000)%(D+.6);try{if(t<D)emoPose({},u,LDV.emo,t);else for(const A of u.arms){A.sh.rotation.set(.15,0,A.sd*.12);A.el.rotation.x=-.2}}catch(e){}window.__ldvT=t}
+  else for(const A of u.arms){A.sh.rotation.set(.15,0,A.sd*.12);A.el.rotation.x=-.2}
+  LDV.cam.position.set(0,1.15,LDV.emo?4.6:3.9);LDV.cam.lookAt(0,.98,0);LDV.r.setClearColor(0,0);LDV.r.render(LDV.sc,LDV.cam);window.__ldvFrames=(window.__ldvFrames||0)+1}
+ LDV.raf=requestAnimationFrame(f)};f()}
+function ldCrateName(it){const c=XCRATES.find(x=>x.id===it.crate);return c?c.n:'a crate'}
+function ldRender(){const sec=$('#charSec');if(!sec)return;const chars=LDT==='chars',L=chars?CHARS:EMOTES;const eqc=charOf({id:ME,bot:false});
+ let sel=LDV.sel[LDT];if(!sel||!L.find(x=>x.id===sel))sel=LDV.sel[LDT]=chars?eqc:(L.find(e=>e.free)||L[0]).id;const it=chars?CHAR[sel]:EMOTE[sel];const own=!!(it.free||ACC.owned[it.id]);
+ sec.innerHTML=`<div class="sub" style="margin:4px 0 8px">${chars?'Pick a character to preview it. Owned characters can be equipped (synced to other players in matches).':'Pick an emote to preview it on your equipped character. Owned emotes are in your wheel - hold <b>'+esc6(keyLbl(KBM.emote))+'</b> in a match.'}</div>
+ <div class="ldwrap"><div class="ldgrid">${L.map(c=>{const o=c.free||ACC.owned[c.id],eq=chars&&eqc===c.id;return `<div class="scard ${o?'':'lock'} ${eq?'eq':''} ${c.id===sel?'sel':''}" data-i="${c.id}"><div class="rb" style="background:${RAR[c.rar].c}"></div>${eq?'<span class="tag">EQUIPPED</span>':o?'':'<span class="tag" style="background:#444">&#128274; LOCKED</span>'}<img src="${chars?portrait(c.id,null,96,120):portrait(eqc,c.id,96,120)}" style="height:96px;width:auto;display:block;margin:0 auto"><div style="font-size:12px">${esc6(c.n)}</div><div style="font-size:10px;color:${RAR[c.rar].c}">${RAR[c.rar].n}</div></div>`}).join('')}</div><div id="ldvSlot"></div></div>`;
+ const box=ldvBox();$('#ldvSlot').appendChild(box);
+ $('#ldvInfo').innerHTML=`<div class="skvn">${esc6(it.n)}</div><div><span style="color:${RAR[it.rar].c};font-weight:bold">${RAR[it.rar].n}</span> &middot; ${chars?'Character':'Emote'}</div>${own?'':`<div class="sub" style="color:#fb6">&#128274; Not owned - get it from the ${esc6(ldCrateName(it))} (Crates tab)</div>`}<div class="sub">Drag to rotate</div>`;
+ const eb=$('#ldvEquip');if(chars){const eq=eqc===it.id;eb.style.display='';eb.disabled=!own||eq;eb.textContent=!own?'Locked':eq?'Equipped':'Equip';
+  eb.onclick=async()=>{if(!ACC.ok()){menuMsg('Sign in to change character.');return}const r=await ACC.equip('_char',it.free?'':it.id);if(r&&r.error)menuMsg(r.error);skinsPage()}}
+ else{eb.style.display='';eb.disabled=true;eb.textContent=own?'Owned - in your emote wheel':'Locked'}
+ sec.querySelectorAll('.ldgrid .scard').forEach(el=>el.onclick=()=>{LDV.sel[LDT]=el.dataset.i;ldRender()});
+ if(ldvInit()){ldvSet(chars?it.id:eqc,chars?null:it.id);ldvLoop()}}
+{const _sp=skinsPage;skinsPage=function(){_sp();const pg=$('#mLoad');if(!pg)return;let tb=$('#ldTabs');if(!tb){tb=document.createElement('div');tb.id='ldTabs';tb.className='ptabs ldtabs';pg.insertBefore(tb,$('#skinFilter'))}
+ tb.innerHTML=[['skins','Gun Skins'],['chars','Characters'],['emotes','Emotes']].map(([k,n])=>`<button class="pt ${LDT===k?'on':''}" data-t="${k}">${n}</button>`).join('');tb.querySelectorAll('.pt').forEach(b=>b.onclick=()=>{LDT=b.dataset.t;skinsPage()});
+ const sk=LDT==='skins';$('#skinFilter').style.display=sk?'':'none';$('#skinGrid').style.display=sk?'':'none';const sec=$('#charSec');
+ const sub=pg.querySelector(':scope > .sub');if(sub)sub.textContent=sk?'Equip skins you own. Skins show on your viewmodel, your third-person model, HUD icons, and to everyone in online matches.':LDT==='chars'?'Characters you play as. Everyone in an online match sees your character.':'Emotes you can play in matches.';
+ if(sec){if(sk){sec.innerHTML='';sec.style.display='none'}else{sec.style.display='';ldRender()}}}}
+window.__ld={get LDT(){return LDT},set LDT(v){LDT=v},LDV,ldRender};
+// ===================== v7.1: smooth match end -> podium =====================
+// Cause of the old 1-4s freeze: podStart() added a shadow-casting SpotLight + 2 PointLights to the scene, which changes the light
+// count, so three.js recompiled EVERY material's shader in the same frame (plus new podium materials). Fix: at match start (while
+// the map is loading anyway) build a throwaway podium set and renderer.compile() with it, so the podium-light shader variants are
+// cached; then on match end: ~1.2s slow motion with the VICTORY/DEFEAT banner, 0.6s fade to black, build podium, 0.6s fade in.
+function podWarm(){if(!G||!G.mapDef||typeof renderer==='undefined')return;const t0=performance.now();try{const grp=new THREE.Group();podSet(grp,podStage(),0,0);
+ const tx=plaqueTex('Warmup',false,0,0,false);grp.add(new THREE.Mesh(new THREE.PlaneGeometry(1,.4),new THREE.MeshStandardMaterial({map:tx.t,metalness:.75,roughness:.3,emissive:0x2a1d05,emissiveMap:tx.t,emissiveIntensity:.35})));
+ grp.add(new THREE.Mesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshStandardMaterial({color:0x2a3040,metalness:.2,roughness:.55})));grp.traverse(o=>{if(o.isMesh){o.castShadow=o.receiveShadow=true}});
+ scene.add(grp);const hid=[];scene.traverse(o=>{if(!o.visible&&!o.isLight){hid.push(o);o.visible=true}});const prt=renderer.getRenderTarget();try{if(typeof composer!=='undefined'&&composer)renderer.setRenderTarget(composer.readBuffer);renderer.compile(scene,camera)}finally{renderer.setRenderTarget(prt);for(const o of hid)o.visible=false}
+ const S=podStage(),cp=camera.position.clone(),cq=camera.quaternion.clone(),fov=camera.fov,rt=[S.d[2],0,-S.d[0]];camera.position.set(S.c[0]+S.d[0]*8.8+rt[0]*1.35,S.c[1]+1.9,S.c[2]+S.d[2]*8.8+rt[2]*1.35);camera.lookAt(S.c[0]+rt[0]*1.35,S.c[1]+1.15,S.c[2]-S.d[2]*.8);camera.fov=50;camera.updateProjectionMatrix();
+ renderFrame();camera.position.copy(cp);camera.quaternion.copy(cq);camera.fov=fov;camera.updateProjectionMatrix();scene.remove(grp);window.__podWarmMs=Math.round(performance.now()-t0)}catch(e){console.warn('podWarm',e)}}
+{const _sg2=startGame;startGame=function(cfg){const r=_sg2.apply(this,arguments);if(G)G._podWarm=0;return r}}
+// warm once per match on the first frame where every player mesh exists (round 1 pre-countdown)
+setInterval(()=>{try{if(G&&!G._podWarm&&G.P.every((p,i)=>pMeshes[i])&&(G.rs==='pre'||G.rs==='vote'||G.rs==='live')){G._podWarm=1;podWarm()}}catch(e){}},250);
+const PODTR={on:false,e:null,t0:0,built:false};
+function podFadeEl(){let f=$('#podFade');if(!f){f=document.createElement('div');f.id='podFade';f.style.cssText='position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:7';document.body.appendChild(f)}return f}
+{const _he2=handleEvent;handleEvent=function(e){if(e&&e.t==='podium'&&!window.__podInstant){PODTR.on=true;PODTR.e=e;PODTR.t0=performance.now();PODTR.built=false;PODTR.defer=null;document.body.classList.add('podtrans');window.__podTr={start:PODTR.t0};return}return _he2(e)}}
+function podTrTick(){const f=podFadeEl();if(!PODTR.on){if(!PODIUM&&+f.style.opacity)f.style.opacity=0;return}if(!G){PODTR.on=false;window.__tscale=1;f.style.opacity=0;document.body.classList.remove('podtrans');return}
+ const t=(performance.now()-PODTR.t0)/1000,SL=1.2,FO=.6,FI=.6,ss=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x)};
+ if(t<SL){window.__tscale=.3;f.style.opacity=0}
+ else if(t<SL+FO){window.__tscale=.3;f.style.opacity=ss((t-SL)/FO).toFixed(3)}
+ else if(!PODTR.built){f.style.opacity=1;PODTR.built=true;window.__tscale=1;const b0=performance.now();try{podStart(PODTR.e)}catch(x){console.warn('podium',x)}window.__podTr.build=Math.round(performance.now()-b0);bannerT=0;PODTR.defer=null;PODTR.t1=performance.now()}
+ else{const k=(performance.now()-PODTR.t1)/1000/FI;f.style.opacity=(1-ss(k)).toFixed(3);if(k>=1){f.style.opacity=0;PODTR.on=false;document.body.classList.remove('podtrans');window.__podTr.done=performance.now()}}}
+// keep the VICTORY/DEFEAT banner up through the slow-mo; any banner raised meanwhile (map vote / match over) shows once the podium is in
+{const _bn=banner;banner=function(t,x){if(PODTR.on&&!PODTR.built&&!/VICTORY|DEFEAT/.test(String(t))&&/VICTORY|DEFEAT/.test($('#banner').textContent)){PODTR.defer=[t,x];bannerT=Math.max(bannerT,3);return}return _bn(t,x)}}
+{const _rf3=renderFrame;renderFrame=function(){try{podTrTick()}catch(e){}return _rf3()}}
+{const _mv3=mapVoteHUD;mapVoteHUD=function(){if(PODTR.on&&!PODTR.built){$('#mvote').classList.add('hide');return}if(PODTR.on&&G&&G.qp&&QPEND.t)QPEND.t=Math.max(QPEND.t,performance.now()+MAPVOTE_TIME*1000-1);return _mv3()}}
+
+// ---- v8: crate tab scrolling. Every ACC.emit() (key buy, profile/online refresh, leaderboard load, dev list) calls renderMenu(),
+// which rebuilds #crateGrid via innerHTML; while the new images decode the grid collapses and the .pbody scrollTop snaps back
+// to 0, so the wheel "does nothing" on the crate tab. Keep the scroll position across re-renders.
+{const _rm=renderMenu;renderMenu=function(){const pb=document.querySelector('#menu .pbody');const st=pb?pb.scrollTop:0;
+ if(pb&&!window.__noKeepScroll){pb.style.minHeight='';const g=document.querySelector('#crateGrid');if(g&&MSEL==='mCrates')g.style.minHeight=g.offsetHeight+'px'}
+ _rm.apply(this,arguments);if(pb&&!window.__noKeepScroll){pb.scrollTop=st;const g=document.querySelector('#crateGrid');if(g)requestAnimationFrame(()=>{pb.scrollTop=Math.max(pb.scrollTop,st);g.style.minHeight=''})}};
+ const i=ACC.listeners.indexOf(_rm);if(i>=0)ACC.listeners[i]=renderMenu}
+
+// ---- v8: gun picture on hover in the per-gun stats table (and anything tagged data-gun). Reuses the cached side-on renders (ICON / skinIcon).
+{const tip=document.createElement('div');tip.id='gunTip';tip.style.cssText='position:fixed;z-index:60;pointer-events:none;display:none;background:rgba(10,14,20,.92);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:8px 10px;font:600 12px system-ui;color:#dfe8f0;text-align:center';document.body.appendChild(tip);
+ const BYN={};for(const k in W)BYN[W[k].n]=k;
+ const gunFrom=el=>{if(!el||!el.closest)return null;const d=el.closest('[data-gun]');if(d)return d.dataset.gun;const tr=el.closest('#gunTbl tr');if(!tr||!tr.cells||!tr.cells[0]||tr.querySelector('th'))return null;return BYN[tr.cells[0].textContent.trim()]||null};
+ document.addEventListener('mouseover',e=>{const g=gunFrom(e.target);if(!g||!W[g]){tip.style.display='none';return}try{makeIcons()}catch(_){}const sk=typeof equippedSkin==='function'?equippedSkin(g):'';const src=(sk&&skinIcon(g,sk,240,96))||ICON[g];if(!src){tip.style.display='none';return}
+  tip.innerHTML=`<img src="${src}" style="width:240px;height:96px;object-fit:contain;display:block"><div>${esc6(W[g].n)} <span style="color:#9ab">${esc6(W[g].cls)}</span></div>`;tip.style.display='block';window.__gunTip=g});
+ document.addEventListener('mousemove',e=>{if(tip.style.display==='none')return;tip.style.left=Math.min(innerWidth-270,e.clientX+16)+'px';tip.style.top=Math.min(innerHeight-140,e.clientY+12)+'px'});}
+
+// ---- v8: emote / character crates get proper drawn icons like the gun crates (they only had a unicode glyph before)
+{const _cp=cratesPage;cratesPage=function(){_cp();document.querySelectorAll('#crateGrid .xcrate').forEach(el=>{const c=XCRATES.find(x=>x.id===el.dataset.x);const b=el.querySelector('.cbox');if(c&&b&&!b.classList.contains('hasimg')){b.innerHTML=`<img class="cimg" alt="${esc6(c.n)}" src="${crateIcon(c)}">`;b.classList.add('hasimg')}})}}

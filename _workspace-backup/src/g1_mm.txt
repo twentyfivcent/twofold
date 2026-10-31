@@ -1,0 +1,38 @@
+// ===================== QUICK PLAY MATCHMAKING (v7) =====================
+// Supabase queue (mm_join / mm_poll / mm_cancel RPCs, see supabase-setup.sql v7 block), polled every 1.5s.
+// Matched group shares a room code; the longest waiter is elected host and registers that code with PeerJS,
+// everyone else joins it. Host fills empty slots with bots and auto-starts. Room codes still work as before.
+const MM={st:'idle',ticket:'',t0:0,timer:0,code:'',host:false,fill:20,joinTries:0,startT:0,
+ sb(){return typeof ACC!=='undefined'&&ACC.sb&&ACC.status!=='nosetup'&&ACC.status!=='offline'?ACC.sb:null},
+ ui(t,s){$('#mmBox').classList.toggle('hide',this.st==='idle'||this.st==='lobby');$('#mmTitle').textContent=t;$('#mmSub').textContent=s||''},
+ async start(){if(this.st!=='idle')return;const sb=this.sb();if(!sb){$('#menuMsg').textContent='Matchmaking server unavailable right now - use a room code or Practice.';return}
+  this.ticket=Array.from(crypto.getRandomValues(new Uint8Array(12)),b=>b.toString(16).padStart(2,'0')).join('');
+  this.st='search';this.t0=performance.now();this.ui('Searching for players...','Connecting to matchmaking...');
+  const r=await sb.rpc('mm_join',{p_ticket:this.ticket,p_name:myName()});if(r.error){this.fail('Matchmaking error: '+r.error.message);return}
+  this.poll()},
+ async poll(){clearTimeout(this.timer);if(this.st!=='search')return;const sb=this.sb();const r=await sb.rpc('mm_poll',{p_ticket:this.ticket,p_fill_after:this.fill});if(this.st!=='search')return;
+  if(r.error){if(/not in queue/.test(r.error.message)){const j=await sb.rpc('mm_join',{p_ticket:this.ticket,p_name:myName()});if(j.error){this.fail('Matchmaking error: '+j.error.message);return}}
+   else{this.fail('Matchmaking error: '+r.error.message);return}}
+  const row=r.data;const el=Math.floor((performance.now()-this.t0)/1000);
+  if(row&&row.status==='matched'){this.matched(row);return}
+  let n='';try{const c=await sb.rpc('mm_count');if(!c.error)n=c.data+' searching · '}catch(e){}
+  this.ui('Searching for players...',n+el+'s'+(el<this.fill?' · bots fill empty slots after '+this.fill+'s':' · starting with bots...'));
+  this.timer=setTimeout(()=>this.poll(),1500)},
+ matched(row){this.code=row.room_code;this.host=!!row.is_host;this.joinTries=0;
+  if(this.host){this.st='lobby';this.ui('','');hostOnline(this.code);this.startT=performance.now();this.autoStart()}
+  else{this.st='joining';this.ui('Match found!','Joining host...');this.tryJoin()}},
+ tryJoin(){if(this.st!=='joining')return;this.joinTries++;joinOnline(this.code);clearTimeout(this.timer);
+  this.timer=setTimeout(()=>{if(this.st!=='joining')return;if(LOBBY&&LOBBY.me>=0||started){this.st='lobby';this.done();return}
+   if(this.joinTries<4){cleanupNet();this.tryJoin()}else this.requeue('Host did not answer - searching again...')},4000)},
+ autoStart(){clearTimeout(this.timer);if(this.st!=='lobby'||started)return;if(!LOBBY||!LOBBY.host){this.timer=setTimeout(()=>this.autoStart(),300);return}
+  const humans=LOBBY.slots.filter(s=>s&&s.human).length,el=(performance.now()-this.startT)/1000,left=Math.max(0,Math.ceil(8-el));
+  lobbyMsg(humans>=4?'Lobby full - starting...':`Waiting for matched players (${humans}/4)... starting in ${left}s`);
+  if(humans>=4||el>=8){this.done();hostStartMatch();return}this.timer=setTimeout(()=>this.autoStart(),500)},
+ done(){const sb=this.sb(),t=this.ticket;if(sb&&t)sb.rpc('mm_cancel',{p_ticket:t});this.ticket='';this.ui('','')},
+ requeue(msg){cleanupNet();if(!$('#lobby').classList.contains('hide')){$('#lobby').classList.add('hide');$('#menu').classList.remove('hide')}LOBBY=null;
+  this.st='idle';const t=this.ticket;this.ticket='';const sb=this.sb();if(sb&&t)sb.rpc('mm_cancel',{p_ticket:t});this.start().then(()=>{if(msg)$('#mmSub').textContent=msg})},
+ async cancel(){clearTimeout(this.timer);const was=this.st;this.st='idle';this.ui('','');const sb=this.sb(),t=this.ticket;this.ticket='';if(sb&&t)await sb.rpc('mm_cancel',{p_ticket:t});
+  if(was==='joining'&&!started){cleanupNet();LOBBY=null;$('#lobby').classList.add('hide');$('#menu').classList.remove('hide')}$('#menuMsg').textContent='Search cancelled.'},
+ fail(m){clearTimeout(this.timer);this.st='idle';this.ui('','');$('#menuMsg').textContent=m},
+ reset(){clearTimeout(this.timer);if(this.ticket)this.done();this.st='idle';this.ui('','')}};
+window.addEventListener('beforeunload',()=>{try{if(MM.ticket&&MM.sb())MM.sb().rpc('mm_cancel',{p_ticket:MM.ticket})}catch(e){}});

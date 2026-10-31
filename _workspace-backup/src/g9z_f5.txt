@@ -1,0 +1,15 @@
+// ===== V8.1 (K) throw strength: thrown utilities (lethal G / tactical Q, not the knife) leave faster so a full throw carries ~25-30m on flat ground.
+// Same physics as v7.1 (18 m/s^2 gravity, same bounces); only launch speed changes (15 -> 20, crouched 11 -> 14.5). Cooking only shortens the fuse, never the speed.
+const NADE_THROW={v:20,crouch:14.5};
+throwUtil=function(p,fuse){const kn=p.util==='knife';const d=dirYP(p.yaw,p.pitch+(kn?0:.12));const o=eye(p);const v=kn?KNIFE_V:p.crouch?NADE_THROW.crouch:NADE_THROW.v;
+ sendOrDo({t:'nade',type:p.util,pos:[o[0]+d[0]*.45,o[1]+d[1]*.45,o[2]+d[2]*.45],vel:kn?[d[0]*v,d[1]*v,d[2]*v]:[d[0]*v+p.vel[0]*.5,d[1]*v+1.5,d[2]*v+p.vel[2]*.5],fuse},p.id)};
+// ===== V8.1 (I) bullet/hitscan + thrown-object water impacts: a hit point under water (pools, wading water, liquid volumes) becomes a splash
+// at the water surface (pooled PN particles + ripple + plop) instead of a ground spark/decal. Impacts already ride the synced 'tr' events.
+function waterSurfAt(x,y,z){if(!G)return null;let s=null;for(const b of G.boxes)if(b.liquid&&x>b.min[0]&&x<b.max[0]&&z>b.min[2]&&z<b.max[2]&&y<=b.max[1]+.02&&y>=b.min[1]-.05)s=Math.max(s==null?-1e9:s,b.max[1]);
+ const R=G.mapDef&&G.mapDef.wadeR;if(R)for(const r of R)if(x>r.x0&&x<r.x1&&z>r.z0&&z<r.z1&&y<=r.d+.02)s=Math.max(s==null?-1e9:s,r.d);return s}
+const WIMP={n:0,last:null};window.__wimp=WIMP;
+function waterImpact(x,y,z,k){WIMP.n++;WIMP.last=[x,y,z];try{splash(x,y,z,k||1)}catch(e){}try{const g=SND.out([x,y,z],.55);if(g){const t=AC.currentTime;SND.nz(g,t,.09,'bandpass',1100+Math.random()*400,3,.9);SND.nz(g,t+.03,.14,'lowpass',380,1,.6)}}catch(e){}}
+{const _ai=addImpact;addImpact=function(e,d){try{if(e&&G){const s=waterSurfAt(e[0],e[1],e[2]);if(s!=null){let x=e[0],z=e[2];if(d&&d[1]<-.05){const back=(s-e[1])/-d[1];x=e[0]-d[0]*back;z=e[2]-d[2]*back}const s2=waterSurfAt(x,s-.01,z);waterImpact(s2!=null?x:e[0],s,s2!=null?z:e[2],.9);return}}}catch(x){}return _ai.apply(this,arguments)}}
+// grenades / knives / bolts entering water: one splash per object, from the rendered positions (host + clients alike)
+setInterval(()=>{try{if(!G||!G.nades)return;for(const n of G.nades){if(!n||!n.pos||n._ws)continue;const s=waterSurfAt(n.pos[0],n.pos[1],n.pos[2]);if(s!=null&&n.pos[1]<=s+.02){n._ws=1;waterImpact(n.pos[0],s,n.pos[2],.7)}}
+ if(G.knives)for(const k of G.knives){if(!k||k._ws||!k.pos)continue;const s=waterSurfAt(k.pos[0],k.pos[1],k.pos[2]);k._ws=1;if(s!=null)waterImpact(k.pos[0],s,k.pos[2],.6)}}catch(e){}},50);

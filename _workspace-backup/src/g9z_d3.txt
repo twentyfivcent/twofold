@@ -1,0 +1,94 @@
+// ===================== V8 DROP 3a: Velvet Ace slot machines (E), new melee model, character-matched first-person hands =====================
+// ---- slot machines: cosmetic only (no money, no network state). Each cabinet box comes from the map; this dresses it and runs the reels locally.
+const SLOTS={list:[],near:-1,hint:null};const SLOT_SYM=['7','BAR','\u2660','\u2665','\u2666','\u2605'],SLOT_COL=['#ff3030','#f0d060','#e8e8e8','#ff4060','#ff9a30','#60d0ff'];
+function slotReelTex(sl){const c=sl.cv,x=c.getContext('2d');x.fillStyle='#f4ecd8';x.fillRect(0,0,192,72);
+ for(let i=0;i<3;i++){const y=sl.spin>0?(performance.now()/40+i*17)%72:0;for(const off of sl.spin>0?[-72,0]:[0]){const s=sl.spin>0?(Math.floor(performance.now()/60)+i*2+(off?1:0))%6:sl.res[i];
+   x.fillStyle=SLOT_COL[s];x.font=(s===1?'bold 26px':'bold 44px')+' Georgia,serif';x.textAlign='center';x.textBaseline='middle';x.fillText(SLOT_SYM[s],32+i*64,36+y+off)}
+  x.fillStyle='rgba(0,0,0,.35)';x.fillRect(63+i*64,0,2,72)}
+ x.fillStyle='rgba(0,0,0,.18)';x.fillRect(0,0,192,10);x.fillRect(0,62,192,10);sl.tex.needsUpdate=true}
+function slotDress(m){SLOTS.list=[];if(!m||!m.slots||m.sd||!mapGroup)return;
+ const cab=smat(0x7a1a1a,.35,.4),gold=smat(0xd8b050,.3,.9),chrome=smat(0xd0d4d8,.2,.95),dark=smat(0x151515,.6,.1);
+ const all=[];for(const s of m.slots){all.push([s[0]*MS,s[1]*MS,s[2]]);all.push([-s[0]*MS,-s[1]*MS,-s[2]])}
+ all.forEach((q,i)=>{const [x,z,f]=q;const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=f<0?-Math.PI/2:Math.PI/2;// local -z... face = local +z
+  const W=.7*MS*.75,D=.75*MS*.75;// cabinet head + marquee above the 1.0m collision box
+  const head=new THREE.Mesh(new THREE.BoxGeometry(W*1.02,.62,D*.8),cab);head.position.set(0,1.31,-D*.1);g.add(head);
+  const trim=new THREE.Mesh(new THREE.BoxGeometry(W*1.08,.05,D*.9),gold);trim.position.set(0,1.0,0);g.add(trim);
+  const cv=document.createElement('canvas');cv.width=192;cv.height=72;const tx=new THREE.CanvasTexture(cv);tx.encoding=THREE.sRGBEncoding;
+  const reel=new THREE.Mesh(new THREE.PlaneGeometry(W*.82,W*.82*72/192),new THREE.MeshBasicMaterial({map:tx}));reel.position.set(0,1.3,D*.31);g.add(reel);
+  const bez=new THREE.Mesh(new THREE.BoxGeometry(W*.9,W*.9*72/192+.06,.02),chrome);bez.position.set(0,1.3,D*.3-.012);g.add(bez);
+  const mq=new THREE.Mesh(new THREE.BoxGeometry(W*.98,.2,D*.5),new THREE.MeshStandardMaterial({color:lin(0xffd070),emissive:lin(0xffb040),emissiveIntensity:1.2,roughness:.4}));mq.position.set(0,1.73,-D*.05);g.add(mq);
+  const bulbs=[];for(let k=0;k<7;k++){const b=new THREE.Mesh(new THREE.SphereGeometry(.024,8,6),new THREE.MeshBasicMaterial({color:lin(0xfff0b0)}));b.position.set(-W*.42+k*W*.14,1.73,-D*.05+D*.26);g.add(b);bulbs.push(b)}
+  const tray=new THREE.Mesh(new THREE.BoxGeometry(W*.6,.08,.14),chrome);tray.position.set(0,.62,D*.5+.04);g.add(tray);
+  const panel=new THREE.Mesh(new THREE.BoxGeometry(W*.8,.3,.02),dark);panel.position.set(0,.82,D*.5+.01);g.add(panel);
+  const piv=new THREE.Group();piv.position.set(W*.55,1.12,0);g.add(piv);const base=new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,.08,12),chrome);base.rotation.z=Math.PI/2;piv.add(base);
+  const arm=new THREE.Mesh(new THREE.CylinderGeometry(.016,.016,.42,8),chrome);arm.position.set(.05,.21,0);piv.add(arm);const ball=new THREE.Mesh(new THREE.SphereGeometry(.045,12,10),new THREE.MeshStandardMaterial({color:lin(0xc01818),roughness:.25}));ball.position.set(.05,.43,0);piv.add(ball);
+  const light=new THREE.PointLight(0xffc060,0,4,2);light.position.set(0,1.9,D*.6);g.add(light);
+  g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=true}});mapGroup.add(g);
+  const front=[x+(f<0?-1:1)*(D/2+.55),z];// standing spot in front of the screen (cabinet faces the lane)
+  const sl={i,g,cv,tex:tx,mq,bulbs,piv,light,pos:[x,z],front,res:[i%6,(i+2)%6,(i+4)%6],spin:0,flash:0,win:false,t:0,lbl:null};slotReelTex(sl);SLOTS.list.push(sl)})}
+function slotLabel(sl,txt,col){if(sl.lbl){sl.g.remove(sl.lbl);sl.lbl=null}const c=document.createElement('canvas');c.width=256;c.height=64;const x=c.getContext('2d');x.font='bold 40px Georgia,serif';x.textAlign='center';x.textBaseline='middle';
+ x.lineWidth=6;x.strokeStyle='#000';x.strokeText(txt,128,32);x.fillStyle=col;x.fillText(txt,128,32);const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;
+ const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthTest:false}));sp.scale.set(1.1,.275,1);sp.position.set(0,2.05,0);sp.renderOrder=999;sl.g.add(sp);sl.lbl=sp;sl.lblT=3}
+function slotSound(kind){try{const g=SND.out(null,.55);if(!g)return;const t=AC.currentTime;
+ if(kind==='pull'){SND.nz(g,t,.08,'bandpass',900,3,.5);for(let k=0;k<10;k++)SND.nz(g,t+.12+k*.11,.025,'highpass',2600,4,.25)}
+ else if(kind==='win'){[523,659,784,1047,1319].forEach((f,k)=>SND.tn(g,t+k*.09,f,f,.22,'square',.18));for(let k=0;k<12;k++)SND.tn(g,t+.5+k*.05,2400+(k%3)*300,2200,.05,'triangle',.12)}
+ else{SND.tn(g,t,220,110,.45,'sawtooth',.22);SND.tn(g,t+.05,233,116,.45,'square',.12)}}catch(e){}}
+function slotPull(i,force){const sl=SLOTS.list[i];if(!sl||sl.spin>0||sl.t>0)return false;sl.spin=1.5;sl.t=2.6;sl.win=force===undefined?Math.random()<.28:!!force;
+ if(sl.win){const s=Math.floor(Math.random()*6);sl.res=[s,s,s]}else{let r;do{r=[0,1,2].map(()=>Math.floor(Math.random()*6))}while(r[0]===r[1]&&r[1]===r[2]);sl.res=r}
+ slotSound('pull');window.__slotLog=(window.__slotLog||[]);return true}
+function slotTick(dt){if(!G||!G.mapDef||!SLOTS.list.length)return;const now=performance.now()/1000;
+ for(const sl of SLOTS.list){if(sl.t>0)sl.t-=dt;sl.piv.rotation.z=sl.spin>1.2?-(1.5-sl.spin)/.3*1.1:sl.spin>0?-1.1*Math.max(0,(sl.spin-.9)/.3):0;
+  if(sl.spin>0){sl.spin-=dt;slotReelTex(sl);if(sl.spin<=0){sl.spin=0;slotReelTex(sl);sl.flash=sl.win?2.4:1.8;slotSound(sl.win?'win':'lose');slotLabel(sl,sl.win?'WINNER!':'BUST',sl.win?'#ffd040':'#ff5040');
+    window.__slotLog.push({i:sl.i,win:sl.win,res:sl.res.slice()})}}
+  if(sl.lbl){sl.lblT-=dt;sl.lbl.position.y=2.05+(3-sl.lblT)*.1;sl.lbl.material.opacity=Math.min(1,sl.lblT);if(sl.lblT<=0){sl.g.remove(sl.lbl);sl.lbl=null}}
+  const fl=sl.flash>0;if(fl)sl.flash-=dt;const on=k=>sl.spin>0?((Math.floor(now*12)+k)%3===0):fl?(sl.win?((Math.floor(now*14)+k)%2===0):Math.floor(now*6)%2===0):((Math.floor(now*2)+k)%7!==0);
+  sl.bulbs.forEach((b,k)=>b.material.color.copy(lin(on(k)?(fl&&!sl.win?0xff3020:0xfff0b0):0x3a2a10)));
+  sl.mq.material.emissive.copy(lin(fl?(sl.win?0xffd040:0xc01010):0xffb040));sl.mq.material.emissiveIntensity=fl?(sl.win?2.6+Math.sin(now*30):1.4):1.2;sl.light.intensity=fl?(sl.win?3:1.2):0;sl.light.color.copy(lin(fl&&!sl.win?0xff3020:0xffc060))}
+ // proximity + hint
+ const me=G.P[ME];let n=-1;if(me&&me.alive&&!deadView()){let bd=1.25;for(const sl of SLOTS.list){const d=Math.hypot(me.pos[0]-sl.front[0],me.pos[2]-sl.front[1]);if(d<bd&&me.pos[1]<.6){bd=d;n=sl.i}}}
+ SLOTS.near=n;if(!SLOTS.hint){const h=document.createElement('div');h.id='slotHint';h.style.cssText='position:fixed;left:50%;top:62%;transform:translateX(-50%);padding:6px 14px;background:rgba(20,10,8,.78);border:1px solid #c8a050;color:#f4dca0;font:600 14px Georgia,serif;letter-spacing:1px;border-radius:4px;pointer-events:none;z-index:30;display:none';document.body.appendChild(h);SLOTS.hint=h}
+ const sl=SLOTS.list[n];SLOTS.hint.style.display=n>=0?'block':'none';if(n>=0)SLOTS.hint.textContent=sl.spin>0?'Reels spinning\u2026':sl.t>0?'Cooling down\u2026':`[${keyName(kc('takeover'))}] Pull the lever  \u2014  just for fun, no money`}
+addEventListener('keydown',e=>{if(e.repeat||!G||!SLOTS.list.length||SLOTS.near<0)return;if(typeof CHAT!=='undefined'&&CHAT.open)return;if(e.code!==kc('takeover'))return;const me=G.P[ME];if(!me||!me.alive)return;slotPull(SLOTS.near)});
+{const _bm=buildMap;buildMap=function(m){const r=_bm.apply(this,arguments);try{slotDress(m)}catch(e){console.warn('slots',e)}return r}}
+{const _rf=renderFrame;let lt=performance.now();renderFrame=function(){const n=performance.now(),dt=Math.min(1,(n-lt)/1000);lt=n;try{slotTick(dt)}catch(e){}return _rf.apply(this,arguments)}}
+window.__slots={get list(){return SLOTS.list.map(s=>({i:s.i,pos:s.pos,front:s.front,spin:s.spin,res:s.res,win:s.win}))},get near(){return SLOTS.near},pull:slotPull};
+
+// ---- new melee model: clip-point combat knife (extruded blade with fuller + edge bevel, brass guard, ribbed grip, pommel)
+function meleeModel(){const k=new THREE.Group();const sh=new THREE.Shape();sh.moveTo(0,-.014);sh.lineTo(.17,-.012);sh.quadraticCurveTo(.215,-.004,.235,.012);sh.lineTo(.18,.011);sh.quadraticCurveTo(.15,.018,.12,.018);sh.lineTo(0,.018);sh.lineTo(0,-.014);
+ const bg=new THREE.ExtrudeGeometry(sh,{depth:.004,bevelEnabled:true,bevelThickness:.002,bevelSize:.002,bevelSegments:2});bg.translate(0,0,-.002);
+ const steel=smat(0xc8cdd2,.22,.95),dk=smat(0x2a2c30,.5,.6),brass=smat(0xc8a050,.3,.9),grip=smat(0x1a1612,.85,.05);
+ const blade=new THREE.Mesh(bg,steel);blade.rotation.y=Math.PI/2;k.add(blade);// blade runs toward -z
+ const ful=new THREE.Mesh(new THREE.BoxGeometry(.0065,.005,.11),dk);ful.position.set(0,.006,-.07);k.add(ful);
+ const guard=new THREE.Mesh(new THREE.BoxGeometry(.016,.058,.012),brass);guard.position.set(0,.002,.004);k.add(guard);
+ const g=new THREE.Mesh(new THREE.CylinderGeometry(.0135,.015,.1,12),grip);g.rotation.x=Math.PI/2;g.position.set(0,.002,.058);k.add(g);
+ for(let i=0;i<5;i++){const r=new THREE.Mesh(new THREE.TorusGeometry(.0145,.0022,6,14),dk);r.position.set(0,.002,.022+i*.018);k.add(r)}
+ const pm=new THREE.Mesh(new THREE.SphereGeometry(.017,12,10),brass);pm.scale.set(1,1,.7);pm.position.set(0,.002,.112);k.add(pm);
+ k.traverse(o=>{if(o.isMesh)o.castShadow=true});k.userData.melee3a=1;return k}
+{const _km=knifeMesh;knifeMesh=function(){const k=_km.apply(this,arguments);const gl=k.userData.gl;for(const c of k.children.slice())if(c!==gl)k.remove(c);const m=meleeModel();m.scale.setScalar(.95);m.position.z=-.02;k.add(m);k.userData.melee3a=1;return k}}
+
+// ---- character-matched first-person hands. The viewed player's character (set each frame in the loop) picks glove style, sleeve, cuff and accents.
+const HANDSTY={op:{gl:0x2a2b2e,gt:'fabric'},ch_vanguard:{gl:0x7a6a58,gt:'metal',plate:1,bulk:1.08},ch_nomad:{gl:0xb8a07a,gt:'cloth',bare:1,wrap:1},ch_ronin:{gl:0x2c2a34,gt:'fabric',bare:1},
+ ch_bastion:{gl:0x1c1e22,gt:'fabric',plate:1,bulk:1.06},ch_specter:{gl:0x14161c,gt:'fabric',glow:1},ch_atlas:{gl:0x5a5a44,gt:'metal',plate:1,bulk:1.18,piston:1},ch_wisp:{gl:0xe8e8f0,gt:'metal',glow:1,android:1,bulk:.94}};
+let VMCHAR='op';
+buildArm=function(team,sd){const cid=CHAR[VMCHAR]?VMCHAR:'op',C=CHAR[cid],S=HANDSTY[cid]||HANDSTY.op;const a=new THREE.Group();a.userData.cid=cid;
+ const gl=S.gt==='metal'?smat(S.gl,.4,.7):matT(S.gl,S.gt),skin=smat(C.skin,.6,0),sl=matT(S.android?C.armor:C.suit,S.android?'metal':'fabric'),cf=smat(C.trim,.5,.3),band=smat(team===1?0xff8a1e:0x2d8cff,.5,0,.35);
+ const glow=C.glow?new THREE.MeshBasicMaterial({color:lin(C.glow).multiplyScalar(2)}):null;const b=S.bulk||1;
+ const palm=new THREE.Mesh(new THREE.BoxGeometry(.075*b,.085*b,.1),gl);a.add(palm);
+ for(let i=0;i<4;i++){const fm=S.bare?skin:gl;const p1=new THREE.Mesh(new THREE.BoxGeometry(.016*b,.022*b,.03),gl);p1.position.set((-.028+i*.019)*b,-.03,-.058);p1.rotation.x=.45;a.add(p1);
+  const p2=new THREE.Mesh(new THREE.BoxGeometry(.015*b,.019*b,.03),fm);p2.position.set((-.028+i*.019)*b,-.05,-.078);p2.rotation.x=1.1;a.add(p2);
+  if(S.plate){const k=new THREE.Mesh(new THREE.BoxGeometry(.017*b,.008,.02),smat(C.armor,.35,.8));k.position.set((-.028+i*.019)*b,-.014,-.05);k.rotation.x=.45;a.add(k)}
+  if(glow&&S.glow){const t=new THREE.Mesh(new THREE.BoxGeometry(.006,.006,.008),glow);t.position.set((-.028+i*.019)*b,-.06,-.09);a.add(t)}}
+ const th=new THREE.Mesh(new THREE.BoxGeometry(.02*b,.02*b,.06),S.bare?skin:gl);th.position.set(sd*.045*b,.02,-.04);th.rotation.y=sd*.4;a.add(th);
+ if(S.plate){const bp=new THREE.Mesh(new THREE.BoxGeometry(.06*b,.012,.07),smat(C.armor,.35,.8));bp.position.set(0,.048*b,-.005);a.add(bp)}
+ if(S.wrap)for(let i=0;i<3;i++){const w=new THREE.Mesh(new THREE.TorusGeometry(.052,.006,6,16),matT(0xd8c8a0,'cloth'));w.position.z=.08+i*.035;a.add(w)}
+ const cuff=new THREE.Mesh(new THREE.CylinderGeometry(.048*b,.05*b,.05,12),cf);cuff.rotation.x=Math.PI/2;cuff.position.z=.075;a.add(cuff);
+ const arm=new THREE.Mesh(new THREE.CylinderGeometry(.055*b,.065*b,.38,12),sl);arm.rotation.x=Math.PI/2;arm.position.z=.29;a.add(arm);
+ const tb=new THREE.Mesh(new THREE.CylinderGeometry(.067*b,.068*b,.03,12),band);tb.rotation.x=Math.PI/2;tb.position.z=.36;a.add(tb);// team armband
+ if(S.plate){const fp=new THREE.Mesh(new THREE.BoxGeometry(.07*b,.03,.2),smat(C.armor,.35,.8));fp.position.set(0,.058*b,.22);a.add(fp)}
+ if(S.piston)for(const s of [-1,1]){const p=new THREE.Mesh(new THREE.CylinderGeometry(.008,.008,.22,8),smat(0xb0b4b8,.25,.95));p.rotation.x=Math.PI/2;p.position.set(s*.07*b,.02,.2);a.add(p)}
+ if(glow){const st=new THREE.Mesh(new THREE.BoxGeometry(.006,.006,.3),glow);st.position.set(0,.062*b,.27);a.add(st)}
+ return a};
+{const _sv=setViewmodel;setViewmodel=function(id,team,skin){const c=window.__vpChar||'op';if(c!==VMCHAR){VMCHAR=c;vmId=null}const before=vm;const r=_sv.apply(this,arguments);
+ if(vm&&vm!==before){const old=vm.userData.knife;const nk=new THREE.Group();const m=meleeModel();m.scale.setScalar(1.45);m.position.set(-.01,.012,-.03);m.rotation.set(.15,.12,-1.05);nk.add(m);const hand=buildArm(team,1);hand.position.set(.02,-.03,.03);hand.rotation.set(.25,-.3,0);nk.add(hand);const off=buildArm(team,-1);off.userData.offHand=1;off.position.set(-.3,-.13,-.12);off.rotation.set(.35,.45,.85);off.visible=false;vm.add(off);
+  nk.visible=old?old.visible:false;nk.userData.isVMKnife=1;nk.position.set(.12,-.2,-.25);if(old){nk.position.copy(old.position);nk.rotation.copy(old.rotation);camera.remove(old)}camera.add(nk);vm.userData.knife=nk;
+  window.__vmInfo={cid:VMCHAR,team,melee3a:1,hands:vm.children.filter(c=>c.userData&&c.userData.cid).length}}return r}}

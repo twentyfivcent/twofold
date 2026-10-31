@@ -1,0 +1,117 @@
+// ===================== V8 DROP 2: utility HUD icons, active mantle prompt, team pings + radio lines, missions, party =====================
+// ---- utility icons next to the ammo display: lethal [G] + tactical [Q] with counts; active slot highlighted
+function utilIconsHUD(me,emp){let box=$('#utilIcons');if(!box){const am=$('#ammo');if(!am)return;box=document.createElement('div');box.id='utilIcons';am.appendChild(box)}
+ if(!me||!me.lth){box.innerHTML='';return}try{makeIcons()}catch(e){}
+ const lN=me.uAct==='t'?me.lthN:me.utilN,tN=me.uAct==='t'?me.utilN:me.tacN;
+ const cell=(id,n,key,on,kind)=>id&&UT[id]?`<div class="ui ${kind}${on?' on':''}${n>0&&!emp?'':' out'}" data-u="${id}">${ICON[id]?`<img src="${ICON[id]}">`:`<i>${UT[id].n}</i>`}<b>${n}</b><span>${key}</span></div>`:'';
+ const h=cell(me.lth,lN,keyName(kc('util')),me.uAct!=='t','l')+cell(me.tcu,tN,keyName(kc('tactical')),me.uAct==='t','t');if(box.__h!==h){box.__h=h;box.innerHTML=h}}
+{const st=document.createElement('style');st.textContent=`#utilIcons{display:flex;gap:6px;justify-content:flex-end;margin-top:4px}#utilIcons .ui{position:relative;width:58px;height:34px;border:1px solid #fff3;border-radius:6px;background:#0007;display:flex;align-items:center;justify-content:center;opacity:.75}#utilIcons .ui.on{opacity:1;border-color:#fc6}#utilIcons .ui.t.on{border-color:#6cf}#utilIcons .ui.out{opacity:.35}#utilIcons img{max-width:52px;max-height:28px}#utilIcons b{position:absolute;right:3px;bottom:0;font-size:12px;color:#fff}#utilIcons span{position:absolute;left:3px;top:0;font-size:9px;color:#9ab}#utilIcons i{font-size:9px;color:#ccd;font-style:normal}
+#mantleTip{position:fixed;left:50%;top:62%;transform:translateX(-50%);font:600 13px system-ui;color:#dfe8ef;background:#0006;padding:3px 9px;border-radius:5px;pointer-events:none;z-index:6;letter-spacing:.5px}
+#pings{position:fixed;inset:0;pointer-events:none;z-index:5}.png{position:absolute;transform:translate(-50%,-100%);text-align:center;font:700 11px system-ui;text-shadow:0 1px 2px #000}.png .pd{width:14px;height:14px;margin:0 auto;border:2px solid currentColor;transform:rotate(45deg);background:#0005}.png.e{color:#ff4b4b}.png.l{color:#4aa8ff}
+.utag{font-size:9px;padding:0 4px;border-radius:3px;margin-left:4px}.utag.l{background:#a53}.utag.t{background:#357}
+#missList .ms{display:flex;align-items:center;gap:10px;padding:9px 10px;margin:6px 0;border:1px solid #fff2;border-radius:8px;background:#0003}#missList .ms .tr{width:62px;font-size:11px;text-transform:uppercase;font-weight:700}#missList .tr.easy{color:#7d7}#missList .tr.medium{color:#fc6}#missList .tr.hard{color:#f77}#missList .bar{flex:1}#missList .bar i{display:block;height:6px;border-radius:3px;background:#fff2;margin-top:4px;overflow:hidden}#missList .bar i u{display:block;height:100%;background:#5c9}#missList .rw{width:60px;text-align:right;color:#8e8}#missList button{min-width:78px}
+#partyBox{margin:8px 0;font-size:13px;color:#9ab}#partyBox input{width:110px;text-transform:uppercase}#partyBox b{color:#fc6}`;document.head.appendChild(st)}
+
+// ---- active mantle: prompt when a ledge is mantle-able ahead; pressing Space (jump) does it (50_move jump path). Bots keep passive auto-mantle.
+const MANT={t:0,show:false};
+function mantleTipTick(){const me=G&&G.P&&G.P[ME];let ok=false;
+ if(me&&me.alive&&!me.mant&&!me.bot&&typeof mantleProbe==='function'&&!deadView()){try{const f=dirYP(me.yaw,0);ok=!!(window.__mantleTipProbe||mantleProbe)(me,[f[0],0,f[2]])}catch(e){ok=false}}
+ let el=$('#mantleTip');if(ok&&!el){el=document.createElement('div');el.id='mantleTip';document.body.appendChild(el)}
+ if(el){el.textContent=`[${keyName(kc('jump'))}] Mantle`;el.style.display=ok?'':'none'}MANT.show=ok;window.__mantleTip=ok}
+setInterval(()=>{try{mantleTipTick()}catch(e){}},100);
+{const _om=typeof onMantle==='function'?onMantle:null;window.onMantle=onMantle=function(p){if(p&&G&&p.id===ME&&!p.bot)MC.add('mantles',1);if(_om)return _om.apply(this,arguments)}}
+
+// ---- radio voice lines (Piper TTS + radio filter, embedded). Decoded lazily into WebAudio buffers
+const VOX={buf:{},last:0,played:[]};
+async function voxLoad(id){if(VOX.buf[id]||!AC||typeof VOICE_CLIPS==='undefined'||!VOICE_CLIPS[id])return VOX.buf[id];try{const b=await (await fetch(VOICE_CLIPS[id])).arrayBuffer();VOX.buf[id]=await AC.decodeAudioData(b)}catch(e){}return VOX.buf[id]}
+async function voxPlay(kind){const now=performance.now();if(now-VOX.last<900)return;VOX.last=now;const id=kind+(1+Math.floor(Math.random()*3));VOX.played.push(id);window.__voxPlayed=VOX.played;
+ try{const b=await voxLoad(id);const g=SND.out(null,.9);if(!b||!g)return;const s=AC.createBufferSource();s.buffer=b;s.connect(g);s.start()}catch(e){}}
+
+// ---- pings: Z (rebindable) + middle mouse. Red = enemy you are looking at (LOS), blue = location. Team only.
+const PING={list:[],prev:false,lastT:0,hostRate:{}};
+function pingAim(me){const o=eye(me),d=dirYP(me.yaw,me.pitch);let best=null,bc=Math.cos(.075);
+ for(const q of G.P){if(!q||q===me||!q.alive||q.team===me.team||q.off)continue;const c=[q.pos[0],q.pos[1]+1.1,q.pos[2]];const v=[c[0]-o[0],c[1]-o[1],c[2]-o[2]],L=Math.hypot(...v);if(L>120)continue;const cs=(v[0]*d[0]+v[1]*d[1]+v[2]*d[2])/L;if(cs>bc&&los(o,c,true)){bc=cs;best=q}}
+ if(best)return {k:'e',tg:best.id,pos:[best.pos[0],best.pos[1]+2.1,best.pos[2]]};
+ const t=rayWorld(o,d,120);const T=isFinite(t)&&t<120?t:40;return {k:'l',pos:[o[0]+d[0]*T,o[1]+d[1]*T,o[2]+d[2]*T]}}
+function pingPress(){if(!G||!G.P||G.rs==='over')return;const me=G.P[ME];if(!me||!me.alive)return;const now=performance.now();if(now-PING.lastT<350)return;PING.lastT=now;
+ const a=pingAim(me);const m={t:'ping',k:a.k,tg:a.tg,pos:a.pos.map(v=>+v.toFixed(2))};MC.add('pings',1);sendOrDo(m,ME)}
+// host: validate + rate limit (0.6s, burst 3), then emit; the snapshot filter keeps it to that team
+function hostPing(pid,m){const p=G&&G.P[pid];if(!p||!p.alive||!m||!Array.isArray(m.pos)||m.pos.length!==3||!m.pos.every(v=>isFinite(v)&&Math.abs(v)<500))return;
+ const R=PING.hostRate[pid]||(PING.hostRate[pid]={a:3,t:G.el||0});const el=G.el||0;R.a=Math.min(3,R.a+(el-R.t)/0.6);R.t=el;if(R.a<1)return;R.a-=1;
+ let k=m.k==='e'?'e':'l',tg=-1,pos=m.pos.map(Number);
+ if(k==='e'){const q=G.P[m.tg|0];if(q&&q.alive&&q.team!==p.team&&los(eye(p),[q.pos[0],q.pos[1]+1.1,q.pos[2]],true)){tg=q.id;pos=[q.pos[0],q.pos[1]+2.1,q.pos[2]]}else k='l'}
+ emit({t:'ping',team:p.team,from:pid,k,tg,pos:pos.map(v=>+v.toFixed(2))})}
+{const _ha=hostAction;hostAction=function(pid,m){if(m&&m.t==='ping')return hostPing(pid,m);return _ha.apply(this,arguments)}}
+{const _hm=hostMsg;hostMsg=function(c,d){if(d&&d.t==='ping'){if(G&&c.slot!==undefined&&started)hostPing(c.slot,d);return}return _hm.apply(this,arguments)}}
+// team-only delivery: strip the other team's pings from each connection's snapshot
+{const _ns=netSend;netSend=function(c,m){if(m&&m.t==='snap'&&Array.isArray(m.ev)&&m.ev.some(e=>e&&e.t==='ping')&&G&&c&&c.slot!==undefined){const pl=G.P[c.slot];const tm=pl?pl.team:-1;m=Object.assign({},m,{ev:m.ev.filter(e=>!(e&&e.t==='ping')||e.team===tm)})}return _ns(c,m)}}
+function pingShow(e){const me=G&&G.P[ME];if(!me||e.team!==me.team)return;
+ const p=G.P[e.from];PING.list.push({k:e.k,tg:e.tg,pos:e.pos,t:performance.now(),life:e.k==='e'?4000:6000,who:p?p.name:''});if(PING.list.length>6)PING.list.shift();window.__pings=PING.list;voxPlay(e.k==='e'?'enemy':'loc')}
+{const _he=handleEvent;handleEvent=function(e){if(e&&e.t==='ping'){pingShow(e);return}return _he.apply(this,arguments)}}
+const _pv=new THREE.Vector3();
+function pingTick(){if(!G){PING.list.length=0}const now=performance.now();PING.list=PING.list.filter(p=>now-p.t<p.life);window.__pings=PING.list;
+ let box=$('#pings');if(!box){box=document.createElement('div');box.id='pings';document.body.appendChild(box)}
+ if(G&&G.P){const me=G.P[ME];const press=!!(typeof down==='function'&&(down('ping')||K['Mouse1']))&&!(CHAT&&CHAT.open);if(press&&!PING.prev)pingPress();PING.prev=press;
+  let h='';for(const p of PING.list){let pos=p.pos;if(p.k==='e'&&p.tg>=0){const q=G.P[p.tg];if(q&&q.alive){const r=q.rpos||q.pos;pos=[r[0],r[1]+2.1,r[2]]}}
+   _pv.set(pos[0],pos[1],pos[2]).project(camera);if(_pv.z>1)continue;const x=(Math.max(-.97,Math.min(.97,_pv.x))+1)/2*innerWidth,y=(1-(Math.max(-.95,Math.min(.95,_pv.y))+1)/2)*innerHeight;
+   const d=me?Math.round(Math.hypot(pos[0]-me.pos[0],pos[2]-me.pos[2])):0;h+=`<div class="png ${p.k}" style="left:${x|0}px;top:${y|0}px;opacity:${Math.min(1,(p.life-(now-p.t))/600).toFixed(2)}"><div class="pd"></div>${p.k==='e'?'ENEMY':'PING'} ${d}m</div>`}
+  if(box.__h!==h){box.__h=h;box.innerHTML=h}}else if(box.innerHTML)box.innerHTML='',box.__h=''}
+(function pl(){try{pingTick()}catch(e){}requestAnimationFrame(pl)})();
+addEventListener('mousedown',e=>{if(e.button===1&&G)e.preventDefault()},true);
+
+// ---- mission counters (client side, per match; only reported for online matches, server clamps + checks)
+const MC={c:{},round:{died:false,first:true,killers:{}},lastKillT:-9,last:{},
+ reset(){this.c={};this.round={died:false,first:true};this.lastKillT=-9;this.killedBy=-1},add(k,v){this.c[k]=(this.c[k]|0)+v}};MC.reset();
+function wClass(w){const c=(W[w]&&W[w].cls)||'';if(/Pistol|Revolver|Hand Cannon|Derringer/.test(c))return 'pistol';if(/SMG|PDW/.test(c))return 'smg';if(/Shotgun|Double-barrel|Sawed/.test(c))return 'shotgun';if(/LMG/.test(c))return 'lmg';if(/Sniper|Marksman|Crossbow|Lever|Charge/.test(c))return 'sniper';if(/Rifle|Carbine|Bullpup/.test(c))return 'rifle';return ''}
+function missionEv(e){if(!G||!e)return;const me=G.P[ME];if(!me)return;
+ if(e.t==='round'){MC.round={died:false,first:true};return}
+ if(e.t==='rend'){if(e.win===me.team){MC.add('rounds_won',1);if(!MC.round.died)MC.add('flawless',1)}return}
+ if(e.t==='kf'){const first=MC.round.first;MC.round.first=false;
+  if(e.v===ME){MC.round.died=true;MC.killedBy=e.k;return}
+  if(e.k!==ME||e.tk)return;const v=G.P[e.v];MC.add('kills',1);if(e.hs)MC.add('headshots',1);if(first)MC.add('first_bloods',1);
+  if(e.v===MC.killedBy){MC.add('revenge',1);MC.killedBy=-1}
+  const t=(G.el||performance.now()/1000);if(t-MC.lastKillT<=3)MC.add('doubles',1);MC.lastKillT=t;
+  if(v){const d=Math.hypot(v.pos[0]-me.pos[0],v.pos[2]-me.pos[2]);if(d>=30)MC.add('long_kills',1);if(d<=5)MC.add('close_kills',1)}
+  if(!me.ground)MC.add('air_kills',1);if(me.slideT>0)MC.add('slide_kills',1);
+  const w=e.w;if(w==='knife')MC.add('knife_kills',1);if(w==='melee')MC.add('melee_kills',1);if(UT[w])MC.add('util_kills',1);const wc=W[w]?wClass(w):'';if(wc)MC.add(wc+'_kills',1)}}
+{const _he=handleEvent;handleEvent=function(e){try{missionEv(e)}catch(x){}return _he.apply(this,arguments)}}
+{const _sd=sendOrDo;sendOrDo=function(m,pid){if(pid===ME&&m&&(m.t==='nade'||m.t==='util'))MC.add('util_used',1);return _sd.apply(this,arguments)}}
+{const _sg=startGame;startGame=function(){MC.reset();try{const c=$('#lbCard');if(c)c.style.display='none'}catch(e){}return _sg.apply(this,arguments)}}
+{const _mo=ACC.matchOver;ACC.matchOver=async function(won,mvp){const r=await _mo.apply(this,arguments);try{
+ if(!ACC.ok()||!ACC.lastReport||ACC.lastReport.p_mode!=='online')return r;const me=G&&G.P[ME];
+ MC.c.matches=1;MC.c.wins=won?1:0;MC.c.mvp=mvp?1:0;MC.c.damage=Math.round((typeof MSTAT!=='undefined'&&MSTAT.dmg)||0);MC.c.assists=me?(me.as|0):0;
+ window.__missionSent=Object.assign({},MC.c);const q=await ACC.sb.rpc('mission_report',{p_counters:MC.c});window.__missionRes=q&&q.error?String(q.error.message||q.error):'ok';await MISS.load()}catch(e){}return r}}
+
+// ---- missions menu tab
+const MISS={rows:null,msg:'',busy:false,
+ async load(){if(!ACC.ok()){this.rows=null;return}try{const q=await ACC.sb.rpc('my_missions');if(!q.error)this.rows=q.data||[]}catch(e){}if(MSEL==='mMissions')missionsRender()},
+ async claim(slot){if(this.busy)return;this.busy=true;this.msg='';try{const q=await ACC.sb.rpc('claim_mission',{p_slot:slot});if(q.error)this.msg=String(q.error.message||q.error);else{if(q.data)ACC.profile=Object.assign({},ACC.profile,q.data);const m=(this.rows||[]).find(r=>r.slot===slot);this.msg=m?`+$${m.reward} claimed!`:'Claimed!';try{if(typeof rarityCue==='function')rarityCue('Rare')}catch(e){}ACC.emit()}}catch(e){this.msg='Claim failed'}this.busy=false;await this.load()}};
+function nextReset(){const now=new Date();for(let h=0;h<=26;h++){const t=new Date(Math.ceil(now.getTime()/3600000)*3600000+h*3600000);const hr=+new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',hour:'numeric',hour12:false}).format(t)%24;if(hr===4)return t}return null}
+function missionsRender(){const el=$('#missList');if(!el)return;
+ if(!ACC.ok()){el.innerHTML='<div class="sub">Sign in to get 3 daily missions (lobby + Quick Play matches count; Practice vs Bots does not).</div>';return}
+ if(!MISS.rows){el.innerHTML='<div class="sub">Loading missions…</div>';return}
+ const nr=nextReset();const left=nr?Math.max(0,nr-Date.now()):0;
+ el.innerHTML=MISS.rows.map(r=>{const pc=Math.min(100,Math.round(100*r.progress/r.goal));const done=r.progress>=r.goal;return `<div class="ms" data-slot="${r.slot}"><div class="tr ${r.tier}">${r.tier}</div><div class="bar"><div>${r.title}</div><i><u style="width:${pc}%"></u></i><small>${r.progress} / ${r.goal}</small></div><div class="rw">$${r.reward}</div>${r.claimed?'<button disabled>Claimed</button>':`<button class="mclaim" data-slot="${r.slot}" ${done?'':'disabled'}>${done?'Claim':'In progress'}</button>`}</div>`}).join('')
+  +`<div class="sub" style="margin-top:8px">New missions in ${Math.floor(left/3600000)}h ${Math.floor(left/60000)%60}m (4:00 AM Pacific). Only lobby &amp; Quick Play matches count.</div>${MISS.msg?`<div class="sub" style="color:#fc6">${MISS.msg}</div>`:''}`;
+ el.querySelectorAll('.mclaim').forEach(b=>b.onclick=()=>MISS.claim(+b.dataset.slot))}
+{const nav=document.querySelector('.mn[data-m="mCrates"]');if(nav&&!document.querySelector('.mn[data-m="mMissions"]')){const b=document.createElement('button');b.className='mn';b.dataset.m='mMissions';b.textContent='Missions';nav.after(b);
+ const pg=document.createElement('div');pg.className='mpage hide';pg.id='mMissions';pg.innerHTML='<h3>Daily Missions</h3><div class="sub">Three a day - easy, medium, hard. Rewards are paid by the server when you claim.</div><div id="missList"></div>';const cr=$('#mCrates');cr.after(pg)}}
+{const _mt=menuTab;menuTab=function(id){try{const c=$('#lbCard');if(c)c.style.display='none'}catch(e){}const r=_mt.apply(this,arguments);if(id==='mMissions'){missionsRender();MISS.load()}return r}}
+{const _rm=renderMenu;renderMenu=function(){const r=_rm.apply(this,arguments);try{if(MSEL==='mMissions')missionsRender()}catch(e){}return r}}
+try{ACC.listeners.push(()=>{if(ACC.ok()&&!MISS.rows)MISS.load()})}catch(e){}
+
+// ---- party of 2 (same team): code shared with a friend. Quick Play tags both tickets; hosted lobbies place matching codes together
+const PARTY={code:''};
+{const pb=document.querySelector('.playbtns');if(pb&&!$('#partyBox')){const d=document.createElement('div');d.id='partyBox';d.innerHTML='Party (2): <input id="partyCode" maxlength="12" placeholder="CODE"> <button id="partyNew">New</button> <button id="partyLeave">Leave</button> <span id="partyInfo"></span>';pb.after(d)}}
+function partySet(c){c=String(c||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,12);PARTY.code=c.length>=4?c:'';const i=$('#partyCode');if(i&&i.value!==c)i.value=c;const inf=$('#partyInfo');if(inf)inf.innerHTML=PARTY.code?`Party <b>${PARTY.code}</b> - your friend enters the same code, then you both Quick Play or join the same room.`:''}
+{const i=$('#partyCode');if(i)i.oninput=()=>partySet(i.value);const n=$('#partyNew');if(n)n.onclick=()=>{let s='';const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';for(let k=0;k<6;k++)s+=A[Math.random()*A.length|0];partySet(s)};const l=$('#partyLeave');if(l)l.onclick=()=>partySet('')}
+{const _po=MM.poll;MM.poll=async function(){try{if(PARTY.code&&this.ticket&&this._pt!==this.ticket){this._pt=this.ticket;const sb=this.sb();if(sb)await sb.rpc('mm_party',{p_ticket:this.ticket,p_party:PARTY.code})}}catch(e){}return _po.apply(this,arguments)}}
+{const _ns=netSend;netSend=function(c,m){if(m&&m.t==='hello'&&PARTY.code)m.party=PARTY.code;return _ns(c,m)}}
+let PARTYPREF=null;
+{const _fs=freeSlot;freeSlot=function(team){if(PARTYPREF!==null&&team!==PARTYPREF){const s=_fs(PARTYPREF);if(s>=0)return s}return _fs(team)}}
+{const _hm=hostMsg;hostMsg=function(c,d){if(d&&d.t==='hello'&&!started&&LOBBY&&typeof d.party==='string'&&/^[A-Z0-9]{4,12}$/.test(d.party)){
+  const mate=LOBBY.slots.findIndex(s=>s&&s.human&&(s.conn?s.party===d.party:PARTY.code===d.party));PARTYPREF=mate>=0?(mate<2?0:1):null;
+  const pref=PARTYPREF;try{return _hm.apply(this,arguments)}finally{PARTYPREF=null;const s=c.slot;if(s!==undefined&&LOBBY.slots[s]){LOBBY.slots[s].party=d.party;
+   if(pref!==null&&(s<2?0:1)!==pref){/*mate's team full: swap a non-party guest over so the pair plays together*/const j=(pref?[2,3]:[0,1]).find(i=>{const x=LOBBY.slots[i];return x&&x.conn&&x.party!==d.party});
+    if(j!==undefined){const A=LOBBY.slots[j];LOBBY.slots[j]=LOBBY.slots[s];LOBBY.slots[s]=A;c.slot=j;A.conn.slot=s;try{broadcastLobby()}catch(e){}}}}}}
+ return _hm.apply(this,arguments)}}
