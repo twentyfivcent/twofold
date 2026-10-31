@@ -191,7 +191,7 @@ input,select{background:#0f1720;color:#fff;border:1px solid #456;padding:8px;fon
 <canvas id="menuBg"></canvas>
 <div id="menu" class="scr m6">
 <div class="mwrap glass">
- <div class="pnav"><div class="ptitle">TWOFOLD<span>2V2 ROUND ARENA &middot; V8 DROP 3b</span></div>
+ <div class="pnav"><div class="ptitle">TWOFOLD<span>2V2 ROUND ARENA &middot; <span class="appVer">v8.1</span></span></div>
   <button class="mn on" data-m="mPlay">Play</button><button class="mn" data-m="mLoad">Loadout &amp; Skins</button><button class="mn" data-m="mCrates">Crates</button><button class="mn" data-m="mStats">Stats &amp; Leaderboard</button><button class="mn" data-m="mSet">Settings</button>
   <div style="flex:1"></div>
   <div id="accPanel" class="accp" title="Account"></div>
@@ -222,7 +222,7 @@ input,select{background:#0f1720;color:#fff;border:1px solid #456;padding:8px;fon
    <div class="prow"><span>Music volume</span><input class="musVol" type="range" min="0" max="1" step="0.05"><b class="musV"></b><label><input type="checkbox" class="musMute"> Mute music</label></div>
    <div class="prow"><span>Damage numbers</span><input type="checkbox" id="dnIn"></div>
    <div class="prow"><span>Display</span><button class="sm fsBtn">Enter fullscreen</button><label><input type="checkbox" class="mmIn"> Minimap</label><label title="Go fullscreen on your first click or key press"><input type="checkbox" class="fsDefIn"> Start in fullscreen</label></div>
-   <div class="prow"><span>Graphics detail</span><select class="gfxSel"><option value="low">Low (classic)</option><option value="med">Medium</option><option value="high">High</option></select></div><div class="prow"><span>Graphics</span><select class="qSel"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select><label><input type="checkbox" class="goreIn"> Blood effects</label></div>
+   <div class="prow"><span>Graphics</span><select class="gfxSel"><option value="low">Low</option><option value="med">Med</option><option value="high">High</option></select></div><div class="prow"><label><input type="checkbox" class="goreIn"> Blood effects</label></div>
    <div class="prow"><span>Voice</span><label><input type="checkbox" class="omIn"> Open mic</label><span style="flex:none">Mic</span><input class="micVol" type="range" min="0" max="2" step="0.05" style="width:90px"><span style="flex:none">Voices</span><input class="vcVol" type="range" min="0" max="1.5" step="0.05" style="width:90px"></div>
    <div class="prow"><span>Controls</span><button class="sm" id="bXh">Crosshair...</button><button class="sm" id="bKeys">Keybinds...</button></div>
    <div class="sub" id="setSync"></div>
@@ -262,7 +262,7 @@ input,select{background:#0f1720;color:#fff;border:1px solid #456;padding:8px;fon
   <div class="ppage" id="pHome"><h3>Match paused</h3><div class="sub">The match keeps running for everyone else. Click Resume (or press it again) to recapture the mouse.</div><div id="pInfo"></div></div>
   <div class="ppage hide" id="pSet"><div class="ptabs"><button class="pt on" data-t="tGame">Game</button><button class="pt" data-t="tGfx">Graphics</button><button class="pt" data-t="tAud">Audio</button><button class="pt" data-t="tXh">Crosshair</button><button class="pt" data-t="tKb">Keybinds</button><button class="pt" data-t="tVc">Voice</button></div>
    <div class="ptab" id="tGame"><div class="prow"><span>Mouse sensitivity</span><input id="sensIn2" type="range" min="0.2" max="3" step="0.05"><b id="sensV2"></b></div><div class="prow"><span>Damage numbers</span><input type="checkbox" id="dnIn2"></div><div class="prow"><span>Invert scroll-wheel weapon switch</span><input type="checkbox" class="invScr"></div></div>
-   <div class="ptab hide" id="tGfx"><div class="prow"><span>Display</span><button class="sm fsBtn">Enter fullscreen</button><label><input type="checkbox" class="mmIn"> Minimap</label><label title="Go fullscreen on your first click or key press"><input type="checkbox" class="fsDefIn"> Start in fullscreen</label></div><div class="prow"><span>Graphics detail</span><select class="gfxSel"><option value="low">Low (classic)</option><option value="med">Medium</option><option value="high">High</option></select></div><div class="prow"><span>Quality</span><select class="qSel"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div><div class="prow"><span>Blood effects</span><input type="checkbox" class="goreIn"></div></div>
+   <div class="ptab hide" id="tGfx"><div class="prow"><span>Display</span><button class="sm fsBtn">Enter fullscreen</button><label><input type="checkbox" class="mmIn"> Minimap</label><label title="Go fullscreen on your first click or key press"><input type="checkbox" class="fsDefIn"> Start in fullscreen</label></div><div class="prow"><span>Graphics</span><select class="gfxSel"><option value="low">Low</option><option value="med">Med</option><option value="high">High</option></select></div><div class="prow"></div><div class="prow"><span>Blood effects</span><input type="checkbox" class="goreIn"></div></div>
    <div class="ptab hide" id="tAud"><div class="prow"><span>Master volume</span><input id="volIn2" type="range" min="0" max="1" step="0.05"><b id="volV2"></b></div><div class="prow"><span>Music volume</span><input class="musVol" type="range" min="0" max="1" step="0.05"><b class="musV"></b><label><input type="checkbox" class="musMute"> Mute music</label></div></div>
    <div class="ptab hide" id="tXh"><div class="prow"><span>Crosshair style, color and size</span><button class="sm" id="bXh2">Open crosshair editor</button></div></div>
    <div class="ptab hide" id="tKb"><div class="prow"><span>Rebind every action (incl. scroll wheel)</span><button class="sm" id="bKeys2">Open keybinds</button></div><div class="prow"><span>Invert scroll-wheel weapon switch</span><input type="checkbox" class="invScr"></div></div>
@@ -1118,7 +1118,7 @@ function deployTick(dt){
  for(const h of G.heals){h.t-=dt;for(const q of G.P)if(q.alive&&q.team===h.team&&Math.hypot(q.pos[0]-h.pos[0],q.pos[2]-h.pos[2])<3.5&&Math.abs(q.pos[1]-h.pos[1])<2)q.hp=Math.min(100,q.hp+14*dt)}
  G.heals=G.heals.filter(h=>h.t>0);
  for(const k of G.knives)k.t+=dt;
- for(const p of G.P){if(!p.alive||p.off||!utilHas(p,'knife')||utilCount(p,'knife')>=UT.knife.c)continue;
+ for(const p of G.P){if(!p.alive||p.off||!knifeCanPick(p))continue;
   for(const k of G.knives){if(k.t<.4)continue;const dy=k.pos[1]-p.pos[1];if(Math.hypot(k.pos[0]-p.pos[0],k.pos[2]-p.pos[2])<1.15&&dy>-.6&&dy<2.5){k.gone=true;utilAdd(p,'knife',1);emit({t:'kpick',s:p.id,id:k.id});break}}}
  G.knives=G.knives.filter(k=>!k.gone);
 }
@@ -2229,7 +2229,7 @@ function render(dt){
  const tk=spect?0:gunTuck(me);VK.tuck=(VK.tuck||0)+(tk-(VK.tuck||0))*Math.min(1,dt*12);if(VK.tuck>.01){vm.rotation.x+=VK.tuck*.95;vm.rotation.y+=VK.tuck*.35;vm.position.z+=VK.tuck*.12;vm.position.y-=VK.tuck*.06}window.__tuck=VK.tuck;
  vmExtras(dt,vp,spect);
  const held=MELSEL&&!spect;VK.swA=Math.max(0,(VK.swA||0)-dt);const sa=VK.swA>0?Math.sin(VK.swA/.25*Math.PI):0;vm.position.y-=sa*.12;
- const kn=vm.userData.knife;kn.visible=(ml>0||held)&&!free;vm.userData.gun.visible=!held;for(const c of vm.children)if(c.userData&&c.userData.cid)c.visible=c.userData.offHand?held:!held;if(kn.visible){kn.position.set(.12-ml*.1+(held?.03:0),-.2+ml*.1-sa*.1,-.25-ml*.28);kn.rotation.set(-.2+ml*.3,ml*.5,-ml*.4)}
+ const kn=vm.userData.knife;kn.visible=(ml>0||held)&&!free;vm.userData.gun.visible=!held;for(const c of vm.children)if(c.userData&&c.userData.cid)c.visible=c.userData.offHand?held:!held;if(kn.visible){kn.position.set(.12-ml*.1+(held?.03:0),-.2+ml*.1-sa*.1,-.25-ml*.28);kn.rotation.set(-.2+ml*.3,ml*.5,-ml*.4)}if(typeof knifeVM==='function')knifeVM(kn,ml,sa,held,free,dt);
  if(vm.userData.gun.userData.coils){const c=(spect?0:me.chg)||0;for(const r of vm.userData.gun.userData.coils)r.material.emissiveIntensity=.6+c*6}
  if(vm.userData.gun.userData.dual){const d=vm.userData.gun.userData.dual;d[0].position.z=VK.alt?VK.kick*.05:0;d[1].position.z=VK.alt?0:VK.kick*.05}
  vm.visible=(me.alive||spect)&&!OVERVIEW&&!free&&!(w.scopeOv&&a>.85)&&!window.__hideVM;if(!vm.visible)kn.visible=false;
@@ -3869,7 +3869,7 @@ buildArm=function(team,sd){const cid=CHAR[VMCHAR]?VMCHAR:'op',C=CHAR[cid],S=HAND
   nk.visible=old?old.visible:false;nk.userData.isVMKnife=1;nk.position.set(.12,-.2,-.25);if(old){nk.position.copy(old.position);nk.rotation.copy(old.rotation);camera.remove(old)}camera.add(nk);vm.userData.knife=nk;
   window.__vmInfo={cid:VMCHAR,team,melee3a:1,hands:vm.children.filter(c=>c.userData&&c.userData.cid).length}}return r}}
 // ===== V8 DROP 3b: graphics tiers (Low = classic v8d3a look; Med/High = approved preview: route A lighting/AO/bloom/grade + route B materials/bevels + HD character detail)
-(function(){const q=new URLSearchParams(location.search).get('gfx');if(q&&/^(low|med|high)$/.test(q))settings.gfx=q;if(!/^(low|med|high)$/.test(settings.gfx||''))settings.gfx='med'})();
+(function(){const q=new URLSearchParams(location.search).get('gfx');if(q&&/^(low|med|high)$/.test(q))settings.gfx=q;if(!/^(low|med|high)$/.test(settings.gfx||''))settings.gfx=({low:'low',medium:'med',high:'high'})[settings.quality]||'med'})();
 function GFXT(){return settings.gfx||'med'}
 const AO_SHADER={uniforms:{tDiffuse:{value:null},tDepth:{value:null},proj:{value:new THREE.Matrix4()},iproj:{value:new THREE.Matrix4()},near:{value:.03},far:{value:320},res:{value:new THREE.Vector2(1,1)},R:{value:.55},str:{value:.85}},
  vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
@@ -3995,6 +3995,169 @@ function czDecor(m){CZ.wheels=CZ.wheels.filter(w=>{let o=w.sp;while(o.parent)o=o
 {const _bm=buildMap;buildMap=function(m){CZ.wheels=[];const r=_bm.apply(this,arguments);try{czDecor(m)}catch(e){console.warn('czDecor',e)}return r}}
 {const _rf=renderFrame;let lt=performance.now();renderFrame=function(){const n=performance.now(),dt=Math.min(1,(n-lt)/1000);lt=n;for(const w of CZ.wheels){w.sp.rotation.y+=dt*.9;w.a-=dt*2.1;w.ball.position.set(Math.cos(w.a)*w.r*.72,.1,Math.sin(w.a)*w.r*.72)}return _rf.apply(this,arguments)}}
 window.__czInfo=()=>{const o={props:{},wheels:CZ.wheels.length,meshes:0};if(mapGroup)mapGroup.traverse(x=>{if(x.userData&&x.userData.czProp)o.props[x.userData.czProp]=(o.props[x.userData.czProp]||0)+1;if(x.isMesh&&x.userData.cz)o.meshes++});return o};
+// ===== V8.1: smooth menu map-pan switches. Root cause: each switch generated the new map's canvas textures (+normal/roughness maps) and compiled its shaders synchronously on one frame.
+// Fix: (1) while the current pan is on screen, pre-generate the NEXT map's textures one per frame (cached in TEXC/NRMC, identical output); (2) after any buildMap, warm shaders with renderer.compile so the first visible frame doesn't stall.
+const MWARM={i:-1,q:[],names:{}};
+function mwNames(m){const s=JSON.stringify([m.half,m.center,m.spawnCover,m.tex,m.floor&&0]);const o=[];for(const k of Object.keys(TEXGEN))if(s.indexOf('"'+k+'"')>=0)o.push(k);for(const k of Object.values(m.tex||{}))if(k&&!o.includes(k))o.push(k);return o}
+function mwStep(){if(MPAN.i<0||!MAPS.length)return;const nx=(MPAN.i+1)%MAPS.length;if(MWARM.i!==nx){MWARM.i=nx;MWARM.q=[];for(const n of mwNames(MAPS[nx])){MWARM.q.push(['t',n]);if(settings.quality!=='low')MWARM.q.push(['d',n])}}
+ const el=performance.now()/1000-MPAN.t0;if(el<1.6||el>MPAN.dur-1.4)return;// stay out of the fades
+ const j=MWARM.q.shift();if(!j)return;try{const t=j[0]==='t'?tex(j[1]):derived(j[1]);const tt=j[0]==='t'?[t]:[t.n,t.r];if(renderer.initTexture)for(const x of tt)if(x)renderer.initTexture(x)}catch(e){}}
+{const _mp=menuPan;menuPan=function(){const r=_mp.apply(this,arguments);try{mwStep()}catch(e){}return r}}
+{const _bm=buildMap;buildMap=function(m){const r=_bm.apply(this,arguments);try{if(mapGroup&&renderer.compile){const a=performance.now();renderer.compile(scene,camera);window.__compileMs=performance.now()-a}}catch(e){}return r}}
+window.__mwarm=()=>({next:MWARM.i,left:MWARM.q.length});
+// ===== V8.1: Esc opens/closes the in-game menu without leaving fullscreen (Keyboard Lock API, feature-detected) + rebindable 'Open menu' key fallback.
+const KL={active:false,sup:!!(navigator.keyboard&&navigator.keyboard.lock)};
+function kbLockFS(){if(!KL.sup)return;try{if(fsEl()){const r=navigator.keyboard.lock(['Escape']);KL.active=true;if(r&&r.then)r.then(()=>{KL.active=true},()=>{KL.active=false})}else{KL.active=false;navigator.keyboard.unlock&&navigator.keyboard.unlock()}}catch(e){KL.active=false}window.__kl={sup:KL.sup,active:KL.active}}
+document.addEventListener('fullscreenchange',kbLockFS);document.addEventListener('webkitfullscreenchange',kbLockFS);
+KB_ACTIONS.push(['menu','Open / close menu (Esc also works in fullscreen)','KeyP']);KBM=kbMap();
+function gameMenuToggle(){const pz=$('#pause');if(!G||!pz)return;
+ if(typeof locked!=='undefined'&&locked){try{document.exitPointerLock()}catch(e){}if(pz.classList.contains('hide'))pz.classList.remove('hide');for(const k in K)K[k]=false;window.__menuT='open';return}
+ if(!pz.classList.contains('hide')){window.__menuT='resume';lockPointer();return}
+ pz.classList.remove('hide');for(const k in K)K[k]=false;window.__menuT='open'}
+addEventListener('keydown',e=>{if(!G||KBCAP||e.repeat)return;const t=e.target;if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable))return;if(typeof CHAT!=='undefined'&&CHAT.open)return;
+ const isEsc=e.code==='Escape'||e.key==='Escape';if((isEsc&&KL.active&&fsEl())||(KBM.menu&&e.code===KBM.menu)){e.preventDefault();e.stopPropagation();gameMenuToggle()}},true);
+// ===== V8.1 connectivity hardening: relay-only (TURN) fallback for joins + rejoins, fresh ICE on rejoin, send backpressure, stall grace for heartbeat timeouts.
+const NETF={forceRelay:false,relayRetries:0,lastGap:0,big:0,dropped:0};window.__netf=NETF;
+{const _mk=mkPeer;mkPeer=function(id,ice){ice=ice||ICE;if(NETF.forceRelay)ice=Object.assign({},ice,{iceTransportPolicy:'relay'});const p=_mk(id,ice);try{p.__ice=ice}catch(e){}NETF.lastPolicy=ice.iceTransportPolicy||'all';return p}}
+// test hook: simulate a NAT that blocks direct links (only relay-policy peers connect)
+if(typeof FakePeer!=='undefined'){const _c=FakePeer.prototype.connect;FakePeer.prototype.connect=function(r,o){const s=window.__netSim;if(s&&s.failDirect&&!(this.__ice&&this.__ice.iceTransportPolicy==='relay')){const d=new FakeConn(this,r);d.send=()=>{};d.close=()=>{};return d}return _c.call(this,r,o)}}
+// snapshots are superseded every tick: drop them instead of piling into a congested channel (overflowing bufferedAmount closes it)
+{const _s=netSend;netSend=function(c,m){try{const dc=c&&c.dataChannel;if(dc&&m&&m.t==='snap'&&dc.bufferedAmount>262144){NETF.dropped++;return}}catch(e){}return _s(c,m)}}
+// join: if the direct attempt hasn't opened after 9s and a relay is set up, retry once with relay-only ICE
+{const _j=joinOnline;joinOnline=async function(code,_retry){NETF.forceRelay=!!_retry;const r=await _j(code);const seq=LOBBY&&LOBBY.seq;
+ if(!_retry&&relayOn())setTimeout(()=>{if(LOBBY&&LOBBY.seq===seq&&LOBBY.me<0&&!started&&!(hostConn&&hostConn.open)){NETF.relayRetries++;window.__netNote='relay retry';try{$('#menuMsg').textContent='Direct link blocked - retrying through the relay...'}catch(e){}joinOnline(code,true)}},9000);
+ else if(_retry)setTimeout(()=>{NETF.forceRelay=false},100);return r}}
+// rejoin: refresh ICE (relay creds expire), and from the 2nd attempt force the relay if one is set up
+{const _r=clientReconnect;clientReconnect=function(why){if(REJ&&REJ.busy)return _r(why);window.__rejoins=(window.__rejoins||0)+1;const n=(REJ?REJ.n:0)+1;
+ if(relayOn()&&n>=2&&!NETF.forceRelay){NETF.forceRelay=true;NETF.relayRetries++;try{if(peer&&!peer.destroyed)peer.destroy()}catch(e){}peer=null}
+ getIce().then(i=>{LAST_ICE=i}).catch(()=>{});return _r(why)}}
+// stall grace: after a long main-thread stall (map/podium build, tab hidden) queued packets haven't been processed yet; don't count that as silence
+{let lt=performance.now();setInterval(()=>{const n=performance.now();if(n-lt>2500){NETF.lastGap=n-lt;lastHeard=Math.max(lastHeard,n-1000);if(G&&HOST)for(const p of G.P)if(p.conn&&p.conn.lastHeard)p.conn.lastHeard=Math.max(p.conn.lastHeard,n-1000)}lt=n},500)}
+// ===== V8.1 (F) one active ping per player: a new ping replaces that player's previous one (local + teammates; host emits carry `from`)
+{const _ps=pingShow;pingShow=function(e){const me=G&&G.P[ME];if(me&&e&&e.team===me.team){PING.list=PING.list.filter(p=>p.from!==e.from)}const n=PING.list.length;_ps(e);if(PING.list.length>n||PING.list.length===6){const l=PING.list[PING.list.length-1];if(l&&l.from===undefined)l.from=e.from}window.__pings=PING.list}}
+// ===== V8.1 (G) mantle: only start when the landing spot has FULL standing clearance (1.8m) and is supported by the ledge,
+// the whole vault path is clear, and refuse otherwise. The move never ends inside geometry, so the unstuck push-out never fires.
+const MANT_H=1.8,MANT_E=.02;
+function mantClear(x,y,z,h,skip){const q={pos:[x,y,z]};for(const c of G.boxes){if(c===skip||c.liquid)continue;if(overlap(q,c,h))return false}return true}
+mantleProbe=function(p,dir){let f=dirYP(p.yaw,0);if(dir){const l=Math.hypot(dir[0],dir[2]);if(l>.05)f=[dir[0]/l,0,dir[2]/l]}let best=null;const maxH=dir?2.2:1.6;
+ for(const b of G.boxes){if(b.liquid||b.dyn)continue;const top=b.max[1]-p.pos[1];if(top<(dir?.1:.45)||top>maxH)continue;
+  let reach=-1;for(const rr of dir?[.55,.9,1.3]:[.55]){const fx=p.pos[0]+f[0]*rr,fz=p.pos[2]+f[2]*rr;if(!(fx+.2<b.min[0]||fx-.2>b.max[0]||fz+.2<b.min[2]||fz-.2>b.max[2])){reach=rr;break}}if(reach<0)continue;
+  if(b.wall&&b.max[1]>=4)continue;const y1=b.max[1]+MANT_E;
+  // landing: centre must stand on this ledge (or on something at the same height), try a few depths
+  let land=null;for(const d of [reach+.4,reach+.6,reach+.25,reach+.85]){const tx=p.pos[0]+f[0]*d,tz=p.pos[2]+f[2]*d;
+   const sup=G.boxes.some(c=>!c.liquid&&Math.abs(c.max[1]-b.max[1])<.06&&tx>c.min[0]-.05&&tx<c.max[0]+.05&&tz>c.min[2]-.05&&tz<c.max[2]+.05);
+   if(sup&&mantClear(tx,y1,tz,MANT_H)){land=[tx,tz];break}}if(!land)continue;
+  // rise column at the start + the forward path at the top height must be clear for a standing player
+  let ok=mantClear(p.pos[0],Math.max(p.pos[1],y1-.01)+.0,p.pos[2],MANT_H,b)&&mantClear(p.pos[0],p.pos[1]+.05,p.pos[2],Math.max(.1,y1-p.pos[1])+MANT_H-.05,b);
+  for(let s=1;ok&&s<6;s++){const u=s/6;if(!mantClear(p.pos[0]+(land[0]-p.pos[0])*u,y1,p.pos[2]+(land[1]-p.pos[2])*u,MANT_H))ok=false}
+  if(ok&&(!best||b.max[1]<best.y))best={y:y1,to:land}}
+ window.__mantLast=best;return best};
+{const _st=mantleStep;mantleStep=function(p,dt){const m=p.mant;_st(p,dt);if(m&&!p.mant&&!mantClear(p.pos[0],p.pos[1],p.pos[2],pH(p))){/* safety: never end embedded - go back to where the vault started */p.pos=[m.x0,m.y0,m.z0];p.vel=[0,0,0];window.__mantRevert=(window.__mantRevert||0)+1}}}
+// ===== V8.1 (H) pings stopped after round 1: the host rate limiter used G.el, which resets each round -> (el - R.t) went negative and drained the bucket forever.
+// Use a monotonic clock and reset buckets on any clock regression / new match.
+{const _hp=hostPing;hostPing=function(pid,m){const R=PING.hostRate[pid];const el=G&&G.el||0;if(R&&(el<R.t||!isFinite(R.a)||R.a<-1))PING.hostRate[pid]={a:3,t:el};return _hp(pid,m)}}
+// ===== V8.1 (K) throw strength: thrown utilities (lethal G / tactical Q, not the knife) leave faster so a full throw carries ~25-30m on flat ground.
+// Same physics as v7.1 (18 m/s^2 gravity, same bounces); only launch speed changes (15 -> 20, crouched 11 -> 14.5). Cooking only shortens the fuse, never the speed.
+const NADE_THROW={v:20,crouch:14.5};
+throwUtil=function(p,fuse){const kn=p.util==='knife';const d=dirYP(p.yaw,p.pitch+(kn?0:.12));const o=eye(p);const v=kn?KNIFE_V:p.crouch?NADE_THROW.crouch:NADE_THROW.v;
+ sendOrDo({t:'nade',type:p.util,pos:[o[0]+d[0]*.45,o[1]+d[1]*.45,o[2]+d[2]*.45],vel:kn?[d[0]*v,d[1]*v,d[2]*v]:[d[0]*v+p.vel[0]*.5,d[1]*v+1.5,d[2]*v+p.vel[2]*.5],fuse},p.id)};
+// ===== V8.1 (I) bullet/hitscan + thrown-object water impacts: a hit point under water (pools, wading water, liquid volumes) becomes a splash
+// at the water surface (pooled PN particles + ripple + plop) instead of a ground spark/decal. Impacts already ride the synced 'tr' events.
+function waterSurfAt(x,y,z){if(!G)return null;let s=null;for(const b of G.boxes)if(b.liquid&&x>b.min[0]&&x<b.max[0]&&z>b.min[2]&&z<b.max[2]&&y<=b.max[1]+.02&&y>=b.min[1]-.05)s=Math.max(s==null?-1e9:s,b.max[1]);
+ const R=G.mapDef&&G.mapDef.wadeR;if(R)for(const r of R)if(x>r.x0&&x<r.x1&&z>r.z0&&z<r.z1&&y<=r.d+.02)s=Math.max(s==null?-1e9:s,r.d);return s}
+const WIMP={n:0,last:null};window.__wimp=WIMP;
+function waterImpact(x,y,z,k){WIMP.n++;WIMP.last=[x,y,z];try{splash(x,y,z,k||1)}catch(e){}try{const g=SND.out([x,y,z],.55);if(g){const t=AC.currentTime;SND.nz(g,t,.09,'bandpass',1100+Math.random()*400,3,.9);SND.nz(g,t+.03,.14,'lowpass',380,1,.6)}}catch(e){}}
+{const _ai=addImpact;addImpact=function(e,d){try{if(e&&G){const s=waterSurfAt(e[0],e[1],e[2]);if(s!=null){let x=e[0],z=e[2];if(d&&d[1]<-.05){const back=(s-e[1])/-d[1];x=e[0]-d[0]*back;z=e[2]-d[2]*back}const s2=waterSurfAt(x,s-.01,z);waterImpact(s2!=null?x:e[0],s,s2!=null?z:e[2],.9);return}}}catch(x){}return _ai.apply(this,arguments)}}
+// grenades / knives / bolts entering water: one splash per object, from the rendered positions (host + clients alike)
+setInterval(()=>{try{if(!G||!G.nades)return;for(const n of G.nades){if(!n||!n.pos||n._ws)continue;const s=waterSurfAt(n.pos[0],n.pos[1],n.pos[2]);if(s!=null&&n.pos[1]<=s+.02){n._ws=1;waterImpact(n.pos[0],s,n.pos[2],.7)}}
+ if(G.knives)for(const k of G.knives){if(!k||k._ws||!k.pos)continue;const s=waterSurfAt(k.pos[0],k.pos[1],k.pos[2]);k._ws=1;if(s!=null)waterImpact(k.pos[0],s,k.pos[2],.6)}}catch(e){}},50);
+// ===== V8.1 (J) match-start stutter: three r128 compiles a shader program the first time a material/define combo is drawn (players, viewmodels,
+// shadow depth, post FX), which landed in the first seconds of play. During the load we now draw one warm-up frame with EVERY object in the
+// scene forced visible (incl. hidden weapon models, effects, shadow casters), so all programs and textures are ready before play starts.
+function warmScene(tag){if((!G&&tag!=='pan')||!renderer||!scene)return 0;const a=performance.now();const hid=[];
+ try{scene.traverse(o=>{if(o.visible===false){hid.push(o);o.visible=true}});if(camera&&camera.parent!==scene&&camera.children.length)camera.traverse(o=>{if(o.visible===false){hid.push(o);o.visible=true}});
+  const fc=[];scene.traverse(o=>{if(o.isMesh&&o.frustumCulled){fc.push(o);o.frustumCulled=false}});
+  try{if(renderer.compile)renderer.compile(scene,camera)}catch(e){}
+  const sm=renderer.shadowMap&&renderer.shadowMap.enabled;if(sm)renderer.shadowMap.needsUpdate=true;
+  try{renderer.render(scene,camera);const gl=renderer.getContext&&renderer.getContext();if(gl){const px=new Uint8Array(4);gl.readPixels(0,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,px)}/* force the GPU/ANGLE shader compile now, inside the load, not on the first match frame */}catch(e){}
+  for(const o of fc)o.frustumCulled=true}catch(e){}
+ for(const o of hid)o.visible=false;const ms=performance.now()-a;(window.__warm=window.__warm||[]).push({tag,ms:Math.round(ms),objs:hid.length});return ms}
+{const _sg=startGame;startGame=function(cfg){const r=_sg.apply(this,arguments);try{if(G&&typeof podWarm==='function'&&G.P.every((p,i)=>pMeshes[i])){G._podWarm=1;podWarm()}warmScene('start');if(typeof renderFrame==='function'){try{renderFrame()}catch(e){}}}catch(e){}return r}}
+// the podium pre-warm (v8 drop) used to run from a timer in the first seconds of play; it now runs inside the load above.
+// ===== V8.1 (M) knife pickups: credit was lost when the picker's lethal slot wasn't the Talon Knife (utilAdd fell through to utilN, which
+// utilSlot overwrites every tick), and clients never got the host's count (inventory isn't in snapshots). Now:
+//  - a picked-up knife with no knife slot becomes an EXTRA knife (p.xKn). G throws extra knives first (HUD shows Talon Knife xN), then the own lethal returns.
+//  - the host's kpick event carries the authoritative inventory; the picking client adopts it.  - round reset (equip) clears extras.
+function invOf(p){return {lth:p.lth,ln:p.lthN,tcu:p.tcu,tn:p.tacN,x:p.xKn|0,ls:p._ls?[p._ls.lth,p._ls.n]:null,ua:p.uAct}}
+function invSet(p,v){if(!v||!p)return;p.lth=v.lth;p.lthN=v.ln;p.tcu=v.tcu;p.tacN=v.tn;p.xKn=v.x|0;p._ls=v.ls?{lth:v.ls[0],n:v.ls[1]}:null;p.utilN=p.uAct==='t'?p.tacN:p.lthN;p.util=p.uAct==='t'?p.tcu:p.lth}
+{const _ua=utilAdd;utilAdd=function(p,t,d){if(t==='knife'&&p.lth!=='knife'&&p.tcu!=='knife'&&(d>0||(p.xKn|0)>0)){p.xKn=Math.max(0,(p.xKn|0)+d);return}return _ua(p,t,d)}}
+{const _uh=utilHas;utilHas=function(p,t){return _uh(p,t)||(t==='knife'&&(p.xKn|0)>0)}}
+{const _us=utilSlot;utilSlot=function(p,inp,dt){
+ if(p.lth&&(p.xKn|0)>0&&!p._ls&&p.lth!=='knife'&&p.cook<0){p._ls={lth:p.lth,n:p.uAct==='t'?p.lthN:p.utilN};p.lth='knife';p.lthN=p.xKn;p.xKn=0;if(p.uAct!=='t'){p.utilN=p.lthN;p.util='knife'}}
+ const r=_us(p,inp,dt);
+ if(p._ls&&p.lth==='knife'&&p.lthN<=0&&p.cook<0){p.lth=p._ls.lth;p.lthN=p._ls.n;p._ls=null;if(p.uAct!=='t'){p.utilN=p.lthN;p.util=p.lth}}
+ return r}}
+{const _eq=equip;equip=function(p,lo){p.xKn=0;p._ls=null;return _eq.apply(this,arguments)}}
+{const _em=emit;emit=function(e){if(e&&e.t==='kpick'&&G&&G.P[e.s])e.inv=invOf(G.P[e.s]);return _em(e)}}
+{const _he=handleEvent;handleEvent=function(e){if(e&&e.t==='kpick'&&!HOST&&G&&e.s===ME&&e.inv){const me=G.P[ME];if(me)invSet(me,e.inv);window.__kpickSync=(window.__kpickSync||0)+1}return _he.apply(this,arguments)}}
+// ===== V8.1 (L) emotes cut off after ~0.15s: emoCancelCheck treated WHL as "wheel moved", but WHL is the TIMESTAMP of the last weapon-wheel
+// scroll (never reset), so anyone who had scrolled once (common since v8's scroll-to-melee) cancelled every emote at the 150ms grace mark.
+// Now only a scroll / swap / cook / melee / reload / crouch that STARTS after the emote began cancels it, plus the real input keys.
+emoCancelCheck=function(me){if(!me.emo)return;const e=me.emo,age=performance.now()-e.t0;let why='';if(!me.alive)why='dead';else if(me._emoHp!==undefined&&me.hp<me._emoHp)why='damage';
+ else if(age>150){for(const k of EMO_CANCEL)if(down(k)){why=k;break}
+  if(!why){const eb=down('emote');if(e._b!==undefined&&eb&&!e._b)why='emote';e._b=eb}
+  if(!why){if(WHL>e.t0)why='wheel';else if(e._a===undefined)e._a=[me.swapT>0,me.cook>=0,me.meleeT>0,me.reloadT>0,!!me.crouch];else{const a=[me.swapT>0,me.cook>=0,me.meleeT>0,me.reloadT>0,!!me.crouch];if(a.some((v,i)=>v&&!e._a[i]))why='action';e._a=a}}}
+ if(why)emoCancel(me,why)};
+// pickup rule (host-authoritative): knife-lethal players refill up to the normal cap; everyone else can carry up to KNIFE_XCAP extra knives.
+const KNIFE_XCAP=2;function knifeCanPick(p){if(p.lth==='knife'&&!p._ls)return utilCount(p,'knife')<UT.knife.c;if(p.tcu==='knife')return p.tacN<UT.knife.c;const x=(p.xKn|0)+(p._ls&&p.lth==='knife'?p.lthN:0);return x<KNIFE_XCAP}
+// ===== V8.1 (N) one "Graphics" control (Low / Med / High, default Med). The tier drives BOTH the legacy quality params
+// (settings.quality: resolution scale, bloom, shadows) and the v8 gfx detail params. Saved settings migrate to one tier.
+const GFX_Q={low:'low',med:'medium',high:'high'};
+function gfxMigrate(s){s=s||settings;const q2t={low:'low',medium:'med',med:'med',high:'high'};let t=/^(low|med|high)$/.test(s.gfx)?s.gfx:null;
+ if(!t&&s.quality&&q2t[s.quality])t=q2t[s.quality];/* old-only save: keep the user's quality choice */ if(!t)t='med';s.gfx=t;s.quality=GFX_Q[t];return t}
+{const qp=new URLSearchParams(location.search).get('q');const had=JSON.stringify([settings.gfx,settings.quality]);if(qp&&!new URLSearchParams(location.search).get('gfx')){settings.gfx=null;settings.quality=qp}
+ gfxMigrate(settings);let sv={};try{sv=JSON.parse(localStorage.getItem('twofold')||'{}')||{}}catch(e){}if(!qp&&(sv.gfx!==settings.gfx||sv.quality!==settings.quality))try{saveSettings()}catch(e){}try{applyQuality()}catch(e){}}
+{const _sg=setGfx;setGfx=function(t){if(/^(low|med|high)$/.test(t))settings.quality=GFX_Q[t];return _sg(t)}}
+// account sync: a profile with only an old 'quality' (or mismatched pair) is normalised the same way after it loads
+{const _sy=typeof syncGfx==='function'?syncGfx:null;syncGfx=function(){gfxMigrate(settings);if(_sy)_sy.apply(this,arguments);try{syncGfxSel()}catch(e){}}}
+window.__gfxMigrate=gfxMigrate;
+if(typeof syncAllSettings==='function'){const _sa=syncAllSettings;syncAllSettings=function(){const r=_sa.apply(this,arguments);try{const t0=settings.gfx;gfxMigrate(settings);syncGfxSel();applyQuality()}catch(e){}return r}}
+// ===== V8.1 (C) knife first-person hands: knife gripped by a visible RIGHT hand right of centre; empty LEFT hand clearly visible left of centre.
+// Root cause (v8d3b): the knife group sat at camera (.15,-.2,-.25) -> at that depth the grip hand projects below the screen edge, and the off hand was a child
+// of the gun viewmodel (vm) at vm(-.3,-.13,-.12) -> camera ~(-.13,-.3,-.42): low and almost centred. Both are now placed in camera space.
+const KVM={r:{x:.2,y:-.13,z:-.42},l:{x:-.2,y:-.14,z:-.42}};
+function knifeVM(kn,ml,sa,held,free,dt){const c=KVM.r;
+ // grip pose (held) blended with the stab (ml) and swing (sa) offsets of the old pose
+ kn.position.set(c.x-ml*.12,c.y+ml*.08-sa*.06,c.z-ml*.22);kn.rotation.set(-.12+ml*.3,ml*.45,-ml*.35);
+ let off=KVM.off;if(!off||off.parent!==camera){off=null;if(vm)for(const ch of vm.children)if(ch.userData&&ch.userData.offHand){off=ch;break}
+  if(off){vm.remove(off);camera.add(off);KVM.off=off}}
+ if(off){const L=KVM.l;off.visible=kn.visible&&!free&&(held||ml>0);off.position.set(L.x+ml*.03,L.y-sa*.025-ml*.03,L.z);off.rotation.set(.32,-.42,-.55)}}
+// a new viewmodel (character / team change) brings its own off hand: drop the old one from the camera
+{const _sv=setViewmodel;setViewmodel=function(){const r=_sv.apply(this,arguments);if(KVM.off&&KVM.off.parent===camera&&!(vm&&vm.children.includes(KVM.off))){/* rebuilt? */
+  let nw=null;if(vm)for(const ch of vm.children)if(ch.userData&&ch.userData.offHand)nw=ch;if(nw){camera.remove(KVM.off);KVM.off=null}}return r}}
+// camera-space test hook: NDC of the grip hand, knife handle and left hand
+window.__knifeHands=()=>{const kn=vm&&vm.userData.knife;if(!kn)return null;camera.updateMatrixWorld(true);const V=new THREE.Vector3(),B=new THREE.Box3();
+ const ndc=o=>{B.setFromObject(o);B.getCenter(V);return V.project(camera).toArray().map(v=>+v.toFixed(3))};
+ const hand=kn.children.find(c=>c.userData&&c.userData.cid||c.isGroup&&c!==kn.children[0]);const blade=kn.children[0];
+ const hp=new THREE.Vector3(.03,0,0);blade.localToWorld(hp);/* handle = first 0.1 of the blade model */const handle=hp.project(camera).toArray().map(v=>+v.toFixed(3));
+ const hd=hand?(()=>{const p=new THREE.Vector3();hand.getWorldPosition(p);return p.project(camera).toArray().map(v=>+v.toFixed(3))})():null;
+ const off=KVM.off;const ld=off?(()=>{const p=new THREE.Vector3();off.getWorldPosition(p);return p.project(camera).toArray().map(v=>+v.toFixed(3))})():null;
+ return {knifeVis:kn.visible,rightHand:hd,handle,leftHand:ld,leftVis:!!(off&&off.visible),gripDist:hd&&+Math.hypot(hd[0]-handle[0],hd[1]-handle[1]).toFixed(3)}};
+// ===== V8.1 (A2) exposure / bloom balance for the v8 Med/High pipeline.
+// Root cause: Med/High render HDR (NoToneMapping into a half-float target) + RoomEnvironment IBL on top of the same hemi/ambient/sun the Low look was tuned for,
+// then UnrealBloom with threshold .9 — on sun-lit sand/snow/marble almost every pixel is > .9 linear, so bloom smears a bright haze over the whole frame
+// and the final ACES exposure (.86, same as Low) washes highlights out. Fix: bloom only real highlights (threshold above diffuse white), trim IBL ambient,
+// and a per-map exposure trim (measured against the Low look) applied in the final pass.
+const A2={thr:1.35,str:.3,rad:.5,exp:{_:.86},env:.6};
+A2.exp=Object.assign({_:.86},{'Coral Point':.8});
+function a2Apply(){try{if(bloomPass){bloomPass.threshold=A2.thr;bloomPass.strength=A2.str;bloomPass.radius=A2.rad}
+ if(typeof finalPass!=='undefined'&&finalPass&&finalPass.uniforms&&finalPass.uniforms.exposure){const n=G&&G.mapDef&&G.mapDef.n;const e=(n&&A2.exp[n])||A2.exp._;finalPass.uniforms.exposure.value=e}
+ if(scene&&scene.environment&&G&&G.mapDef&&!A2._envDone){}}catch(e){}}
+{const _aq=applyQuality;applyQuality=function(){const r=_aq.apply(this,arguments);a2Apply();return r}}
+{const _bm=buildMap;buildMap=function(){const r=_bm.apply(this,arguments);a2Apply();return r}}
+// IBL is extra ambient on top of the map's hemi/ambient: scale it so Med/High don't lift every surface
+{const _mt=matT;matT=function(c,t,o){const m=_mt(c,t,o);if(m&&m.__gfx&&!m.__a2){m.__a2=1;m.envMapIntensity=(m.envMapIntensity==null?1:m.envMapIntensity)*A2.env}return m}}
+window.__a2=A2;window.__a2Apply=a2Apply;
 // ===================== MENU WIRING =====================
 $('#nameIn').value=settings.name;$('#nameIn').oninput=e=>{if(ACC.acctName())return;settings.name=e.target.value.slice(0,16)||'Player';saveSettings()};
 $('#pMap').innerHTML='<option value="-1">Random map</option>'+MAPS.map((m,i)=>`<option value="${i}">${m.n} - ${m.era}</option>`).join('');
